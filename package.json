@@ -1,0 +1,20 @@
+{
+  "name": "vietnam-carp-fishing-3d",
+  "version": "1.0.0",
+  "description": "Game Giả Lập Câu Đài 3D Chuyên Nghiệp - Đậm Chất Đài Thủ Việt Nam",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 3000 --host",
+    "build": "vite build",
+    "preview": "vite preview",
+    "server": "node server.js",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "three": "^0.160.0",
+    "ws": "^8.22.0"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  }
+}
