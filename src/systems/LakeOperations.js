@@ -383,6 +383,10 @@ export class LakeOperations {
     expireTicket(reason) {
         this.ticket.active = false;
         this.ticket.hoursLeft = 0;
+        // Nếu hết ca câu mà 0 con cá nào -> Ghi nhận +1 Ca Móm vào BXH Móm Ca!
+        if (this.sessionFishCount === 0 && this.ui && typeof this.ui.recordMomSession === 'function') {
+            this.ui.recordMomSession();
+        }
         const st = this.gameplay.state;
         if (st === 'CASTING' || st === 'FLOAT_WAIT' || st === 'BITING') this.gameplay.retrieveRod();
         if (st === 'SEATED' || st === 'CASTING' || st === 'FLOAT_WAIT' || st === 'BITING') {

@@ -88,6 +88,8 @@ function getRoomRoster(roomId) {
                 fishCount: info.fishCount,
                 totalWeight: info.totalWeight,
                 biggestFish: info.biggestFish,
+                money: typeof info.money === 'number' ? info.money : 1000000,
+                momCount: info.momCount || 0,
                 pos: info.pos || { x: 0, y: 1.7, z: 22 },
                 state: info.state || 'SEATED'
             });
@@ -317,6 +319,16 @@ wss.on('connection', (ws) => {
                     broadcastToRoom(info.roomId, packet, ws);
                 }
 
+            } else if (type === 'LEADERBOARD_UPDATE') {
+                const info = clients.get(ws);
+                if (info) {
+                    if (typeof payload.money === 'number') info.money = payload.money;
+                    if (typeof payload.momCount === 'number') info.momCount = payload.momCount;
+                    if (typeof payload.biggestFish === 'number') info.biggestFish = Math.max(info.biggestFish || 0, payload.biggestFish);
+                    if (typeof payload.totalWeight === 'number') info.totalWeight = payload.totalWeight;
+                    if (typeof payload.fishCount === 'number') info.fishCount = payload.fishCount;
+                    if (info.roomId) broadcastToRoom(info.roomId, packet, ws);
+                }
             } else if (type === 'CHAT_MESSAGE') {
                 // Kênh Chat Thế Giới: phát trực tiếp tới toàn bộ người chơi đang online trên server!
                 const msg = JSON.stringify(packet);

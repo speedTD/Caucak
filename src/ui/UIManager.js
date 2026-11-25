@@ -20,7 +20,8 @@ export class UIManager {
         this.network = network;
 
         // Kinh tế
-        this.playerMoney = 50000000; // 50.000.000đ để thoải mái trải nghiệm đồ câu, mồi, trục thẻo & mua khế ước chủ hồ
+        this.playerMoney = 1000000; // Mặc định mỗi người chơi mới nhận 1.000.000đ để đi câu!
+        this.leaderboardMode = 'HUGO'; // BXH mặc định: HUGO (Cá to nhất) | MONEY (Tiền) | MOM (Móm Ca) | WEIGHT (Tổng cân)
         this.playerInventory = {
             'pt_moi_chep_so_1': 5,
             'kl_sua_ngo': 2,
@@ -310,6 +311,12 @@ export class UIManager {
                 </div>
                 <div class="online-panel-body" id="online-panel-body">
                     <div class="online-sub-title">🏆 BẢNG XẾP HẠNG HỒ CÂU REALTIME</div>
+                    <div class="lb-tabs-row" id="online-lb-tabs" style="display:flex;gap:4px;margin-bottom:6px;flex-wrap:wrap;">
+                        <button class="lb-tab-btn active" data-lb="HUGO" style="flex:1;padding:4px 5px;font-size:10.5px;font-weight:800;border-radius:6px;border:1px solid #f59e0b;background:rgba(245,158,11,0.28);color:#fde047;cursor:pointer;">🏆 HUGO</button>
+                        <button class="lb-tab-btn" data-lb="MONEY" style="flex:1;padding:4px 5px;font-size:10.5px;font-weight:800;border-radius:6px;border:1px solid rgba(148,163,184,0.3);background:rgba(30,41,59,0.7);color:#cbd5e1;cursor:pointer;">💰 TIỀN</button>
+                        <button class="lb-tab-btn" data-lb="MOM" style="flex:1;padding:4px 5px;font-size:10.5px;font-weight:800;border-radius:6px;border:1px solid rgba(148,163,184,0.3);background:rgba(30,41,59,0.7);color:#cbd5e1;cursor:pointer;">💀 MÓM CA</button>
+                        <button class="lb-tab-btn" data-lb="WEIGHT" style="flex:1;padding:4px 5px;font-size:10.5px;font-weight:800;border-radius:6px;border:1px solid rgba(148,163,184,0.3);background:rgba(30,41,59,0.7);color:#cbd5e1;cursor:pointer;">⚖️ CÂN</button>
+                    </div>
                     <div class="online-leaderboard" id="online-leaderboard-list"></div>
                     <div class="online-sub-title" style="margin-top:6px;">💬 KÊNH BÁO CÁ & GIAO LƯU CẦN THỦ</div>
                     <div class="online-feed-list" id="online-feed-list"></div>
@@ -3686,7 +3693,11 @@ export class UIManager {
     updateMoneyUI() {
         const el = document.getElementById('ui-money');
         if (el) el.innerText = this.playerMoney.toLocaleString();
+        if (this.network && typeof this.network.syncLocalStats === 'function') {
+            this.network.syncLocalStats({ money: this.playerMoney });
+        }
         this.savePlayerProfile();
+        if (this.leaderboardMode === 'MONEY') this.renderOnlineLeaderboard();
     }
 
     // ==================== LƯU HỒ SƠ TỰ ĐỘNG & SỔ KỶ LỤC CẦN THỦ ====================
@@ -3697,11 +3708,6 @@ export class UIManager {
             const data = JSON.parse(raw);
             if (typeof data.playerMoney === 'number' && !Number.isNaN(data.playerMoney)) {
                 this.playerMoney = data.playerMoney;
-            }
-            // Hỗ trợ nạp vốn nếu người chơi đang bị hết tiền / thấp dưới 5 triệu
-            if (this.playerMoney < 5000000) {
-                this.playerMoney = 50000000;
-                this.savePlayerProfile();
             }
             if (data.playerInventory && typeof data.playerInventory === 'object') {
                 this.playerInventory = { ...this.playerInventory, ...data.playerInventory };
@@ -3920,20 +3926,68 @@ export class UIManager {
         this.showScenarioToast(won ? '🏆 NỔ KÈO RUNG!' : '🔔 KẾT THÚC KÈO RUNG', msg, won ? 'GOLD' : 'INFO');
     }
 
+    recordMomSession() {
+        if (!this.careerStats) this.careerStats = {};
+        this.careerStats.momCount = (this.careerStats.momCount || 0) + 1;
+        this.savePlayerProfile();
+        if (this.network && typeof this.network.syncLocalStats === 'function') {
+            this.network.syncLocalStats({ momCount: this.careerStats.momCount, money: this.playerMoney });
+        }
+        this.renderOnlineLeaderboard();
+        this.showScenarioToast('💀 MÓM CA RỒI!', `Bạn vừa kết thúc ca câu 0 cá (+1 vào BXH Móm Ca — Tổng: ${this.careerStats.momCount} ca móm)!`, 'WARN');
+    }
+
     renderOnlineLeaderboard() {
         if (!this.network) return;
         const container = document.getElementById('online-leaderboard-list');
         if (!container) return;
 
-        const list = this.network.getLeaderboard();
+        // Gắn sự kiện cho 4 tab BXH (HUGO / TIỀN / MÓM CA / TỔNG CÂN)
+        const tabsWrap = document.getElementById('online-lb-tabs');
+        if (tabsWrap && !tabsWrap._bound) {
+            tabsWrap._bound = true;
+            tabsWrap.querySelectorAll('.lb-tab-btn').forEach(btn => {
+                btn.onclick = () => {
+                    this.leaderboardMode = btn.getAttribute('data-lb') || 'HUGO';
+                    tabsWrap.querySelectorAll('.lb-tab-btn').forEach(b => {
+                        const act = b === btn;
+                        b.classList.toggle('active', act);
+                        b.style.background = act ? 'rgba(245,158,11,0.28)' : 'rgba(30,41,59,0.7)';
+                        b.style.borderColor = act ? '#f59e0b' : 'rgba(148,163,184,0.3)';
+                        b.style.color = act ? '#fde047' : '#cbd5e1';
+                    });
+                    this.renderOnlineLeaderboard();
+                };
+            });
+        }
+
+        // Đồng bộ stats mới nhất của local player trước khi xếp hạng
+        if (this.network.localPlayer) {
+            this.network.localPlayer.money = this.playerMoney;
+            this.network.localPlayer.momCount = (this.careerStats && this.careerStats.momCount) ? this.careerStats.momCount : 0;
+            if (this.careerStats && this.careerStats.biggestFish > (this.network.localPlayer.biggestFish || 0)) {
+                this.network.localPlayer.biggestFish = this.careerStats.biggestFish;
+            }
+        }
+
+        const mode = this.leaderboardMode || 'HUGO';
+        const list = this.network.getLeaderboard(mode);
         container.innerHTML = '';
         list.forEach((p, idx) => {
             const row = document.createElement('div');
             row.className = `lb-row ${p.isLocal ? 'lb-local' : ''}`;
             const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`;
+            let scoreText = `${(p.totalWeight || 0).toFixed(1)}kg (${p.fishCount || 0} con)`;
+            if (mode === 'HUGO') {
+                scoreText = `🐟 ${(p.biggestFish || 0).toFixed(1)}kg (To nhất)`;
+            } else if (mode === 'MONEY') {
+                scoreText = `💰 ${Math.round(p.money || 0).toLocaleString()}đ`;
+            } else if (mode === 'MOM') {
+                scoreText = `💀 ${p.momCount || 0} ca móm`;
+            }
             row.innerHTML = `
                 <span class="lb-rank">${medal} ${p.name}</span>
-                <span class="lb-score">${p.totalWeight.toFixed(1)}kg (${p.fishCount} con)</span>
+                <span class="lb-score">${scoreText}</span>
             `;
             container.appendChild(row);
         });

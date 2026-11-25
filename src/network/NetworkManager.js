@@ -34,7 +34,9 @@ export class NetworkManager {
             name: savedName,
             totalWeight: 0,
             biggestFish: 0,
-            fishCount: 0
+            fishCount: 0,
+            money: 1000000,
+            momCount: 0
         };
 
         this.remotePlayers = new Map();
@@ -193,6 +195,18 @@ export class NetworkManager {
             if (packet.senderId !== this.localPlayer.id) {
                 this.handleRemoteSync(packet.senderId, packet.senderName, payload);
             }
+        } else if (type === NET_EVENTS.LEADERBOARD_UPDATE) {
+            if (packet.senderId !== this.localPlayer.id) {
+                const target = this.realPlayers.get(packet.senderId);
+                if (target) {
+                    if (typeof payload.money === 'number') target.money = payload.money;
+                    if (typeof payload.momCount === 'number') target.momCount = payload.momCount;
+                    if (typeof payload.biggestFish === 'number') target.biggestFish = Math.max(target.biggestFish || 0, payload.biggestFish);
+                    if (typeof payload.totalWeight === 'number') target.totalWeight = payload.totalWeight;
+                    if (typeof payload.fishCount === 'number') target.fishCount = payload.fishCount;
+                    this.emitUIEvent({ type: 'LEADERBOARD' });
+                }
+            }
         } else if (type === NET_EVENTS.FISH_HOOKED) {
             if (packet.senderId !== this.localPlayer.id) {
                 this.emitUIEvent({
@@ -279,78 +293,11 @@ export class NetworkManager {
         }
         this.remotePlayers.clear();
 
+        // CHỈ ĐỂ DUY NHẤT 1 BOT NGỒI CÂU MẪU — CHỪA TOÀN BỘ 15 BẾN CÒN LẠI CHO NGƯỜI CHƠI THẬT ONLINE!
         const botsConfig = [
             {
-                id: 'angler_01',
-                name: 'Tuấn Củ Gấu (Bờ Nam Tây)',
-                x: -22.0,
-                z: 20.0,
-                lookX: -22.0,
-                lookZ: 0,
-                umbrellaColor: 0x0284c7,
-                shirtColor: 0x1d4ed8,
-                sleeveColor: 0xf8fafc,
-                hatType: 'CAP',
-                hatColor: 0x1e3a8a,
-                baitUsed: 'Kim Long Sữa Ngô + Cám Phú Thành',
-                totalWeight: 18.4,
-                biggestFish: 9.2,
-                fishCount: 3
-            },
-            {
-                id: 'angler_02',
-                name: 'Hoàng Đài Thủ 6H (Bờ Nam Đông)',
-                x: 22.0,
-                z: 20.0,
-                lookX: 22.0,
-                lookZ: 0,
-                umbrellaColor: 0xdc2626,
-                shirtColor: 0xb91c1c,
-                sleeveColor: 0x111827,
-                hatType: 'BUCKET',
-                hatColor: 0x365314,
-                baitUsed: 'Bộ 3 GUF Săn Hàng + Ốc Xay',
-                totalWeight: 24.8,
-                biggestFish: 12.6,
-                fishCount: 3
-            },
-            {
-                id: 'angler_03',
-                name: 'Lâm Lục Hương (Bờ Bắc Đối Diện)',
-                x: 12.0,
-                z: -20.0,
-                lookX: 12.0,
-                lookZ: 0,
-                umbrellaColor: 0x059669,
-                shirtColor: 0x047857,
-                sleeveColor: 0xe2e8f0,
-                hatType: 'CONICAL',
-                hatColor: 0xd97706,
-                baitUsed: 'Lục Hương Sa Phạm + Sữa Non',
-                totalWeight: 14.1,
-                biggestFish: 7.5,
-                fishCount: 2
-            },
-            {
-                id: 'angler_04',
-                name: 'Đức Vua Câu (Bờ Bắc Đối Diện)',
-                x: -18.0,
-                z: -20.0,
-                lookX: -18.0,
-                lookZ: 0,
-                umbrellaColor: 0x7c3aed,
-                shirtColor: 0x4338ca,
-                sleeveColor: null,
-                hatType: 'CAP',
-                hatColor: 0x0f172a,
-                baitUsed: 'Vua Câu Trứng Sữa + Khoai Lang',
-                totalWeight: 11.2,
-                biggestFish: 6.4,
-                fishCount: 2
-            },
-            {
-                id: 'angler_05',
-                name: 'Bảo Chép Cụ (Bờ Bắc VIP)',
+                id: 'angler_bot_01',
+                name: '🤖 Bác Bảo Chép Củ (Bot)',
                 x: 42.0,
                 z: -20.0,
                 lookX: 42.0,
@@ -360,15 +307,16 @@ export class NetworkManager {
                 sleeveColor: 0xf8fafc,
                 hatType: 'BUCKET',
                 hatColor: 0x0369a1,
-                baitUsed: 'Ốc Tươi Xay + Cám Hạt GUF 8H',
-                totalWeight: 31.5,
-                biggestFish: 14.2,
-                fishCount: 4
+                baitUsed: 'Ốc Ngâm Hương Liệu + Câu Hố Đấu',
+                totalWeight: 16.5,
+                biggestFish: 11.4,
+                fishCount: 2,
+                money: 1650000,
+                momCount: 1
             }
         ];
 
-        // Đặt thời gian lệch nhau để người chơi luôn nhìn thấy có bạn câu đang dòng cá / đứng dậy lùi sau / dùng vợt hớt cá quanh hồ chữ nhật
-        const initialTimers = [2.2, 5.5, 9.0, 13.0, 17.5];
+        const initialTimers = [4.5];
         botsConfig.forEach((cfg, idx) => {
             const x = cfg.x;
             const z = cfg.z;
@@ -1356,15 +1304,38 @@ export class NetworkManager {
         });
     }
 
-    getLeaderboard() {
+    syncLocalStats(stats = {}) {
+        if (typeof stats.money === 'number') this.localPlayer.money = stats.money;
+        if (typeof stats.momCount === 'number') this.localPlayer.momCount = stats.momCount;
+        if (typeof stats.biggestFish === 'number') this.localPlayer.biggestFish = Math.max(this.localPlayer.biggestFish || 0, stats.biggestFish);
+        if (this.mode === 'WEBSOCKET' && this.socket && this.socket.readyState === 1) {
+            this.socket.send(JSON.stringify({
+                type: NET_EVENTS.LEADERBOARD_UPDATE,
+                senderId: this.localPlayer.id,
+                senderName: this.localPlayer.name,
+                timestamp: Date.now(),
+                payload: {
+                    money: this.localPlayer.money,
+                    momCount: this.localPlayer.momCount,
+                    biggestFish: this.localPlayer.biggestFish,
+                    totalWeight: this.localPlayer.totalWeight,
+                    fishCount: this.localPlayer.fishCount
+                }
+            }));
+        }
+    }
+
+    getLeaderboard(mode = 'HUGO') {
         const list = [{ ...this.localPlayer, isLocal: true }];
         this.realPlayers.forEach(rp => {
             list.push({
                 id: rp.id,
                 name: `🟢 ${rp.name}`,
-                totalWeight: rp.totalWeight,
-                biggestFish: rp.biggestFish,
-                fishCount: rp.fishCount,
+                totalWeight: rp.totalWeight || 0,
+                biggestFish: rp.biggestFish || 0,
+                fishCount: rp.fishCount || 0,
+                money: typeof rp.money === 'number' ? rp.money : 1000000,
+                momCount: rp.momCount || 0,
                 isLocal: false,
                 isReal: true
             });
@@ -1373,12 +1344,17 @@ export class NetworkManager {
             list.push({
                 id: bot.id,
                 name: bot.name,
-                totalWeight: bot.totalWeight,
-                biggestFish: bot.biggestFish,
-                fishCount: bot.fishCount,
+                totalWeight: bot.totalWeight || 0,
+                biggestFish: bot.biggestFish || 0,
+                fishCount: bot.fishCount || 0,
+                money: typeof bot.money === 'number' ? bot.money : 1000000,
+                momCount: bot.momCount || 0,
                 isLocal: false
             });
         });
-        return list.sort((a, b) => b.totalWeight - a.totalWeight);
+        if (mode === 'HUGO') return list.sort((a, b) => (b.biggestFish || 0) - (a.biggestFish || 0));
+        if (mode === 'MONEY') return list.sort((a, b) => (b.money || 0) - (a.money || 0));
+        if (mode === 'MOM') return list.sort((a, b) => (b.momCount || 0) - (a.momCount || 0));
+        return list.sort((a, b) => (b.totalWeight || 0) - (a.totalWeight || 0));
     }
 }
