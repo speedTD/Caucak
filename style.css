@@ -4265,3 +4265,63 @@ body, html {
     font-weight: 800;
     margin-left: auto;
 }
+
+/* ==================== KÊNH CHAT THẾ GIỚI NỔI GIỮA TOP HUD (TỐI ĐA 4 GIÂY) ==================== */
+.top-hud {
+    gap: 8px;
+}
+
+.world-chat-ticker {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 460px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.86);
+    border: 1px solid rgba(56, 189, 248, 0.55);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+    color: #f1f5f9;
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    pointer-events: none;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.world-chat-ticker .wc-badge {
+    flex-shrink: 0;
+    font-size: 13px;
+}
+
+.world-chat-ticker .wc-sender {
+    color: #fde047;
+    flex-shrink: 0;
+}
+
+.world-chat-ticker .wc-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.world-chat-ticker.wc-pop {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.world-chat-ticker.wc-fade-out {
+    opacity: 0;
+    transform: translateY(-4px);
+}
+
+@media (max-width: 760px) {
+    .world-chat-ticker {
+        max-width: 180px;
+        font-size: 11px;
+        padding: 4px 8px;
+    }
+}

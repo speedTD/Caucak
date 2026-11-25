@@ -127,6 +127,7 @@ export class UIManager {
                     <span class="ticket-tag" id="ui-ticket-status">🎫 Chờ cổng</span>
                     <span class="stat-tag" id="ui-angler-stats">🪣 <b id="ui-stat-count">0</b> (<b id="ui-stat-weight">0.0</b>kg)<span class="hide-mobile"> • 🏆 <b id="ui-stat-biggest">0.0</b>kg</span></span>
                 </div>
+                <div class="world-chat-ticker" id="world-chat-ticker" style="display: none;"></div>
                 <div class="hud-center-actions">
                     <button id="btn-open-rig" class="btn-hud btn-rig-hud btn-quick-compact" title="Set Cần • 11 Kiểu Cân Phao • Trục & Thẻo 1.0-10.0">⚙️ <span class="hide-mobile">Trục/Phao</span></button>
                     <button id="btn-open-mix" class="btn-hud btn-quick-compact" title="Pha Mồi (M)">🥣 <span class="hide-mobile">Pha Mồi</span></button>
@@ -3869,12 +3870,36 @@ export class UIManager {
                     }
                 } else if (evt.type === 'CHAT') {
                     this.appendOnlineFeed(`💬 <b>${evt.sender}:</b> ${evt.text}`, 'CHAT');
+                    this.showWorldChatTicker(evt.sender, evt.text);
                 } else if (evt.text) {
                     this.appendOnlineFeed(evt.text, evt.type);
                     this.renderOnlineLeaderboard();
                 }
             });
         }
+    }
+
+    // Kênh Chat Thế Giới nổi gọn ngay khoảng trống giữa Top HUD — tự ẩn sau tối đa 4 giây!
+    showWorldChatTicker(sender, text) {
+        const el = document.getElementById('world-chat-ticker');
+        if (!el || !text) return;
+        const safeSender = String(sender || 'Cần thủ').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const safeText = String(text).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        el.innerHTML = `<span class="wc-badge">🌐</span><b class="wc-sender">${safeSender}:</b> <span class="wc-text">${safeText}</span>`;
+        el.style.display = 'flex';
+        el.classList.remove('wc-fade-out');
+        void el.offsetWidth;
+        el.classList.add('wc-pop');
+
+        if (this._worldChatTimer) clearTimeout(this._worldChatTimer);
+        if (this._worldChatHideTimer) clearTimeout(this._worldChatHideTimer);
+        this._worldChatTimer = setTimeout(() => {
+            el.classList.add('wc-fade-out');
+            this._worldChatHideTimer = setTimeout(() => {
+                el.style.display = 'none';
+                el.classList.remove('wc-fade-out', 'wc-pop');
+            }, 320);
+        }, 3680); // Tổng thời gian hiện đúng tối đa 4 giây (3.68s + 0.32s mờ dần)
     }
 
     onRungStarted(ev, shout) {

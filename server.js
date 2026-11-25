@@ -317,7 +317,15 @@ wss.on('connection', (ws) => {
                     broadcastToRoom(info.roomId, packet, ws);
                 }
 
-            } else if (type === 'CHAT_MESSAGE' || type === 'SYSTEM') {
+            } else if (type === 'CHAT_MESSAGE') {
+                // Kênh Chat Thế Giới: phát trực tiếp tới toàn bộ người chơi đang online trên server!
+                const msg = JSON.stringify(packet);
+                clients.forEach((_, clientWs) => {
+                    if (clientWs !== ws && clientWs.readyState === WebSocket.OPEN) {
+                        clientWs.send(msg);
+                    }
+                });
+            } else if (type === 'SYSTEM') {
                 const info = clients.get(ws);
                 if (info && info.roomId) {
                     broadcastToRoom(info.roomId, packet, ws);
