@@ -1524,6 +1524,61 @@ export class Environment {
         );
         this.staffOnArrived = onArrivedCallback;
         this.staffWaitAtSpotTimer = 0;
+        if (this.staffScoopNet) this.staffScoopNet.visible = false;
+    }
+
+    // Chủ Hồ vác vợt cán dài đi bộ ra mép bờ hớt con cá chết nổi lềnh bềnh trên mặt hồ!
+    sendStaffToScoopDeadFish(deadFishInfo, onScoopedCallback) {
+        if (!this.walkingStaff || !deadFishInfo) {
+            if (onScoopedCallback) onScoopedCallback();
+            return;
+        }
+        // Tạo 1 cây vợt hớt cá cán dài gắn vào tay Chủ Hồ (nếu chưa có)
+        if (!this.staffScoopNet) {
+            const netGrp = new THREE.Group();
+            const pole = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.016, 0.02, 2.5, 8),
+                new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.8, roughness: 0.25 })
+            );
+            pole.rotation.x = Math.PI / 2.3;
+            pole.position.set(0.32, 0.92, 1.15);
+            netGrp.add(pole);
+
+            const rim = new THREE.Mesh(
+                new THREE.TorusGeometry(0.30, 0.018, 8, 20),
+                new THREE.MeshStandardMaterial({ color: 0x10b981, metalness: 0.7, roughness: 0.25 })
+            );
+            rim.rotation.x = Math.PI / 2;
+            rim.position.set(0.32, 0.42, 2.32);
+            netGrp.add(rim);
+
+            const bag = new THREE.Mesh(
+                new THREE.ConeGeometry(0.29, 0.45, 14, 1, true),
+                new THREE.MeshBasicMaterial({ color: 0x34d399, wireframe: true, transparent: true, opacity: 0.7 })
+            );
+            bag.rotation.x = Math.PI;
+            bag.position.set(0.32, 0.20, 2.32);
+            netGrp.add(bag);
+
+            this.walkingStaff.add(netGrp);
+            this.staffScoopNet = netGrp;
+        }
+        this.staffScoopNet.visible = true;
+
+        const bankZ = deadFishInfo.sideSouth ? (this.lakeHalfD + 2.4) : (-this.lakeHalfD - 2.4);
+        const startX = THREE.MathUtils.clamp(deadFishInfo.x + (deadFishInfo.x >= 0 ? -9.0 : 9.0), -this.lakeHalfW + 3, this.lakeHalfW - 3);
+        this.walkingStaff.position.set(startX, 0.44, bankZ);
+
+        this.staffTargetPos = new THREE.Vector3(deadFishInfo.x, 0.44, bankZ);
+        this.staffOnArrived = () => {
+            // Quay mặt ra mặt nước giơ vợt hớt cá lên!
+            this.walkingStaff.lookAt(deadFishInfo.x, 0.44, deadFishInfo.z);
+            setTimeout(() => {
+                if (onScoopedCallback) onScoopedCallback();
+                if (this.staffScoopNet) this.staffScoopNet.visible = false;
+            }, 1400);
+        };
+        this.staffWaitAtSpotTimer = 0;
     }
 
     createSpinningAerators() {

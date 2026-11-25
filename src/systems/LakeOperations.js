@@ -59,6 +59,10 @@ export class LakeOperations {
         this.currentWeather = 'SUNNY';
         this.weatherDaysLeft = 2 + Math.floor(Math.random() * 2); // 2-3 ngày nắng ổn định ban đầu
         this.lastFeedingWindowKey = null;
+
+        // Sự kiện vui đời thực: Mỗi ngày ngẫu nhiên 1 con cá chết nổi lềnh bềnh -> Chủ Hồ vác vợt ra hớt!
+        this.deadFishEventDay = 0;
+        this.deadFishTriggerHour = 8.4 + Math.random() * 7.0;
     }
 
     // Chuyển đổi thời tiết tự nhiên khi bước sang ngày mới (không có quy luật cố định, ổn định nhiều ngày như ngoài đời)
@@ -559,6 +563,34 @@ export class LakeOperations {
             // Chủ Hồ thi thoảng hô RUNG thưởng nóng
             this.updateRungEvent(delta);
 
+            // Sự kiện đời thực 1 lần/ngày: 1 con cá chết nổi lềnh bềnh mặt hồ -> Chủ Hồ vác vợt cán dài ra hớt!
+            if (this.deadFishEventDay !== this.day && this.hour >= this.deadFishTriggerHour && this.bubbleSystem && typeof this.bubbleSystem.spawnFloatingDeadFish === 'function') {
+                this.deadFishEventDay = this.day;
+                const deadFish = this.bubbleSystem.spawnFloatingDeadFish();
+                const ownerName = this.owner ? this.owner.name : 'Bác Chủ Hồ';
+                const notice = `🫧 Có 1 em ${deadFish.name} (~${deadFish.weight}kg) bị ngạt nước nổi lềnh bềnh mặt hồ! ${ownerName} đang vác vợt ra ven bờ vớt ngay!`;
+                this.pushEvent(notice, 'INFO');
+                this.network.emitUIEvent({
+                    type: 'CHAT',
+                    sender: ownerName,
+                    text: `Khổ quá có em ${deadFish.name} ${deadFish.weight}kg nổi lềnh bềnh, để tôi vác vợt ra hớt ngay cho sạch nước anh em câu nha! 😂`
+                });
+                setTimeout(() => {
+                    if (this.environment && typeof this.environment.sendStaffToScoopDeadFish === 'function') {
+                        this.environment.sendStaffToScoopDeadFish(deadFish, () => {
+                            this.bubbleSystem.removeFloatingDeadFish();
+                            soundManager.playWaterSplash(1.1);
+                            this.pushEvent(`🧹 ${ownerName} đã dùng vợt hớt gọn em ${deadFish.name} nổi trên mặt hồ lên bờ! Nước sạch bong!`, 'INFO');
+                            this.network.emitUIEvent({
+                                type: 'CHAT',
+                                sender: ownerName,
+                                text: 'Đã hớt gọn con cá nổi lên bờ rồi nha anh em, tiếp tục lên hàng khủng nào! 💪'
+                            });
+                        });
+                    }
+                }, 4000);
+            }
+
             // Đồng bộ giờ hồ hiện tại & tiến độ ca câu (đầu ca / giữa ca cá giãn ra ngoài / cuối ca) cho AI cá
             if (this.bubbleSystem) {
                 this.bubbleSystem.currentHour = this.hour;
@@ -601,6 +633,7 @@ export class LakeOperations {
             this.hour = CLOSE_HOUR + progress * 9.0; // 21:00 -> 30:00 (06:00 sáng hôm sau)
             if (this.campRestSeconds <= 0) {
                 this.day += 1;
+                this.deadFishTriggerHour = 8.4 + Math.random() * 7.5; // Random giờ mới cho ngày tiếp theo
                 let hungryAgain = 0;
                 if (this.bubbleSystem && typeof this.bubbleSystem.onNewLakeDay === 'function') {
                     hungryAgain = this.bubbleSystem.onNewLakeDay();

@@ -161,6 +161,9 @@ export class FishBubbleSystem {
         this.ripples = [];         // Các gợn sóng lan tỏa
         this.fishSchools = [];     // Đàn cá AI 3D có ý thức dưới nước
         this.groundBaitSpots = []; // Ổ mồi xả
+        this.surfaceBreachers = []; // Cá 3D trồi lên mặt nước thở & quẫy đuôi rồi lặn xuống (tỉ lệ Trắm Đen cao nhất!)
+        this.breachTimer = 16.0 + Math.random() * 14.0;
+        this.floatingDeadFish = null; // 1 con cá chết nổi lềnh bềnh ngửa bụng mỗi ngày chờ Chủ Hồ mang vợt ra hớt!
 
         // Kích thước lòng hồ chữ nhật hẹp chuẩn hồ đài thi đấu (170m x 44m, lakeHalfW = 80m, lakeHalfD = 20m)
         this.lakeHalfW = 80.0;
@@ -1910,6 +1913,51 @@ export class FishBubbleSystem {
             }
         }
 
+        // 4.5. CẬP NHẬT CÁ TRỒI LÊN MẶT NƯỚC THỞ & QUẪY ĐUÔI (TỈ LỆ TRẮM ĐEN CAO HƠN!)
+        this.breachTimer -= delta;
+        if (this.breachTimer <= 0 && this.surfaceBreachers.length < 2) {
+            this.breachTimer = 22.0 + Math.random() * 20.0;
+            this.spawnSurfaceBreach(playerPos);
+        }
+        for (let i = this.surfaceBreachers.length - 1; i >= 0; i--) {
+            const br = this.surfaceBreachers[i];
+            br.elapsed += delta;
+            const p = br.elapsed / br.duration;
+            if (p >= 1.0) {
+                this.scene.remove(br.mesh);
+                this.surfaceBreachers.splice(i, 1);
+                continue;
+            }
+            // Quỹ đạo cong trồi lên mặt nước (y: -0.6 -> +0.28 -> -0.75) + quẫy đuôi mạnh ở đỉnh!
+            const arc = Math.sin(p * Math.PI);
+            const y = -0.62 + arc * 0.90;
+            br.mesh.position.x = br.startX + br.dirX * br.elapsed * 1.15;
+            br.mesh.position.z = br.startZ + br.dirZ * br.elapsed * 1.15;
+            br.mesh.position.y = y;
+            // Ngóc đầu lên khi trồi, chúc đầu lặn xuống khi quay về đáy + vẫy thân/đuôi mạnh
+            br.mesh.rotation.x = (0.5 - p) * 1.15;
+            br.mesh.rotation.y = br.yaw + Math.sin(br.elapsed * 26.0) * 0.24;
+            br.mesh.rotation.z = Math.sin(br.elapsed * 22.0) * 0.35;
+
+            if (!br.splashedApex && p >= 0.44) {
+                br.splashedApex = true;
+                this.spawnRipple(br.mesh.position.x, br.mesh.position.z, 2.2);
+                this.spawnCarpBubbles(br.mesh.position.x, br.mesh.position.z, true, true);
+                if (!playerPos || Math.hypot(br.mesh.position.x - playerPos.x, br.mesh.position.z - playerPos.z) < 42) {
+                    soundManager.playWaterSplash(1.4);
+                }
+            }
+        }
+
+        // 4.6. CÁ CHẾT NỔI LỀNH BỀNH NGỬA BỤNG TRÊN MẶT NƯỚC (1 CON/NGÀY CHỜ CHỦ HỒ HỚT)
+        if (this.floatingDeadFish && this.floatingDeadFish.mesh) {
+            this.floatingDeadFish.bobPhase += delta * 2.2;
+            const df = this.floatingDeadFish;
+            df.mesh.position.y = 0.028 + Math.sin(df.bobPhase) * 0.012;
+            df.mesh.rotation.x = Math.sin(df.bobPhase * 0.7) * 0.08;
+            df.mesh.rotation.z = Math.PI + Math.cos(df.bobPhase * 0.9) * 0.12; // Lật ngửa bụng trắng!
+        }
+
         // 4. Gợn sóng loang dần (Gợn tăm cá lăn tăn & Gợn sóng nước lớn)
         for (let i = this.ripples.length - 1; i >= 0; i--) {
             const r = this.ripples[i];
@@ -1930,6 +1978,99 @@ export class FishBubbleSystem {
                 this.ripples.splice(i, 1);
             }
         }
+    }
+
+    // ==================== CÁ TRỒI THỞ QUẪY ĐUÔI & CÁ CHẾT NỔI LỀNH BỀNH ====================
+    spawnSurfaceBreach(playerPos = null) {
+        // Tỉ lệ Trắm Đen trồi lên thở quẫy đuôi CAO HƠN HẲN (56% Trắm Đen, 24% Chép Lợn/Củ, 20% Trắm Cỏ/Chép)
+        const r = Math.random();
+        let speciesKey = 'BLACK_CARP';
+        let label = 'Cá Trắm Đen';
+        let weight = Number((8.0 + Math.random() * 9.5).toFixed(1));
+        if (r < 0.56) {
+            speciesKey = 'BLACK_CARP';
+            label = 'Cá Trắm Đen';
+            weight = Number((8.5 + Math.random() * 9.0).toFixed(1));
+        } else if (r < 0.80) {
+            speciesKey = 'OLD_CARP';
+            label = 'Cá Chép Lợn (Chép Củ)';
+            weight = Number((7.5 + Math.random() * 8.0).toFixed(1));
+        } else {
+            speciesKey = Math.random() < 0.5 ? 'GRASS_CARP' : 'CARP';
+            label = speciesKey === 'GRASS_CARP' ? 'Cá Trắm Cỏ' : 'Cá Chép';
+            weight = Number((4.0 + Math.random() * 5.5).toFixed(1));
+        }
+
+        // Chọn vị trí mặt hồ trong tầm mắt cần thủ (cách 10-34m) để nhìn thấy rõ pha quẫy đuôi!
+        const baseX = playerPos ? THREE.MathUtils.clamp(playerPos.x + (Math.random() - 0.5) * 44, -this.lakeHalfW + 8, this.lakeHalfW - 8) : (Math.random() - 0.5) * 80;
+        const baseZ = (Math.random() - 0.5) * (this.lakeHalfD * 1.45);
+        const yaw = Math.random() * Math.PI * 2;
+        const mesh = buildRealisticFish(speciesKey, weight);
+        mesh.position.set(baseX, -0.62, baseZ);
+        mesh.rotation.y = yaw;
+        this.scene.add(mesh);
+
+        this.spawnRipple(baseX, baseZ, 1.5);
+        this.surfaceBreachers.push({
+            mesh,
+            speciesKey,
+            label,
+            weight,
+            startX: baseX,
+            startZ: baseZ,
+            dirX: Math.sin(yaw),
+            dirZ: Math.cos(yaw),
+            yaw,
+            elapsed: 0,
+            duration: 2.3 + Math.random() * 0.5,
+            splashedApex: false
+        });
+
+        if (speciesKey === 'BLACK_CARP' || weight >= 9.0) {
+            this.lastMindLog = `🌊 ${label} (~${weight}kg) vừa trồi lưng lên mặt nước thở & quẫy đuôi ầm ầm rồi lặn xuống đáy!`;
+            window.dispatchEvent(new CustomEvent('player_fishing_event', {
+                detail: { type: 'INFO', text: `🌊 ${speciesKey === 'BLACK_CARP' ? '🐋' : '🐟'} ${label} (~${weight}kg) vừa trồi lên mặt hồ thở quẫy đuôi tung bọt rồi lặn mất tăm!` }
+            }));
+        }
+    }
+
+    spawnFloatingDeadFish() {
+        this.removeFloatingDeadFish();
+        const speciesPool = [
+            { key: 'CARP', name: 'Cá Chép', weight: Number((3.2 + Math.random() * 3.5).toFixed(1)) },
+            { key: 'GRASS_CARP', name: 'Cá Trắm Cỏ', weight: Number((4.5 + Math.random() * 4.0).toFixed(1)) },
+            { key: 'TILAPIA', name: 'Cá Rô Phi', weight: Number((1.4 + Math.random() * 1.2).toFixed(1)) }
+        ];
+        const pick = speciesPool[Math.floor(Math.random() * speciesPool.length)];
+        // Nổi lềnh bềnh gần mép bờ Nam/Bắc để cần thủ nhìn thấy rõ & Chủ Hồ dễ vác vợt ra hớt!
+        const sideSouth = Math.random() < 0.65;
+        const fx = (Math.random() - 0.5) * 48;
+        const fz = sideSouth ? (this.lakeHalfD - 2.4) : (-this.lakeHalfD + 2.4);
+
+        const mesh = buildRealisticFish(pick.key, pick.weight);
+        mesh.position.set(fx, 0.028, fz);
+        mesh.rotation.z = Math.PI; // Ngửa bụng trắng lên trời!
+        mesh.rotation.y = Math.random() * Math.PI * 2;
+        this.scene.add(mesh);
+        this.spawnRipple(fx, fz, 1.0);
+
+        this.floatingDeadFish = {
+            mesh,
+            name: pick.name,
+            weight: pick.weight,
+            x: fx,
+            z: fz,
+            sideSouth,
+            bobPhase: 0
+        };
+        return this.floatingDeadFish;
+    }
+
+    removeFloatingDeadFish() {
+        if (this.floatingDeadFish && this.floatingDeadFish.mesh) {
+            this.scene.remove(this.floatingDeadFish.mesh);
+        }
+        this.floatingDeadFish = null;
     }
 
     // ==================== CÔNG CỤ NHÀ PHÁT TRIỂN (DEV TOOLS) ====================
