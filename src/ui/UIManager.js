@@ -868,13 +868,26 @@ export class UIManager {
                     <button class="dpad-btn dpad-down" id="btn-m-down">▼</button>
                 </div>
 
-                <!-- Cụm Phím Thao Tác Chuyên Nghiệp Cho Mobile -->
+                <!-- Cụm Phím Thao Tác Chuyên Nghiệp Cho Mobile (Chỉ hiện nút ấn được theo đúng trạng thái!) -->
                 <div class="mobile-action-cluster" id="mobile-actions">
                     <button class="mobile-action-btn btn-m-strike" id="btn-m-strike">⚡ GIẬT CẦN</button>
                     <button class="mobile-action-btn btn-m-cast" id="btn-m-cast">🎣 Vung Cần</button>
                     <button class="mobile-action-btn btn-m-ground" id="btn-m-ground">🥣 Xả Mồi</button>
                     <button class="mobile-action-btn btn-m-stand" id="btn-m-stand">🪑 Đứng/Ngồi</button>
-                    <button class="mobile-action-btn btn-m-zoom" id="btn-m-zoom">🎯 Zoom</button>
+                    <button class="mobile-action-btn btn-m-zoom" id="btn-m-zoom">🎯 Zoom Phao</button>
+                </div>
+            </div>
+
+            <!-- HƯỚNG DẪN XOAY NGANG ĐIỆN THOẠI (MOBILE LANDSCAPE GUIDE) -->
+            <div class="mobile-rotate-overlay" id="mobile-rotate-overlay" style="display: none;">
+                <div class="mobile-rotate-card">
+                    <div class="rotate-phone-icon">📱</div>
+                    <h3>XOAY NGANG ĐIỆN THOẠI ĐỂ NGẮM PHAO CHUẨN NHẤT!</h3>
+                    <p>
+                        • Xoay ngang màn hình giúp <b>nhìn rõ toàn cảnh mặt hồ & Kính Ngắm Phao HD</b>.<br/>
+                        • Dễ dàng canh từng nấc phao (bềnh cả củ / mất hình) và bấm nút <b>Giật Cần / Bo Cá</b> mượt mà!
+                    </p>
+                    <button class="btn-dismiss-rotate" id="btn-dismiss-rotate">Vẫn tiếp tục màn hình dọc</button>
                 </div>
             </div>
         `;
@@ -882,6 +895,31 @@ export class UIManager {
     }
 
     bindEvents() {
+        // Hướng dẫn xoay ngang điện thoại khi người chơi cầm dọc trên mobile
+        this._rotateDismissed = false;
+        const checkMobileRotate = () => {
+            const ov = document.getElementById('mobile-rotate-overlay');
+            if (!ov) return;
+            const isMobilePortrait = window.innerHeight > window.innerWidth && window.innerWidth <= 900;
+            if (!isMobilePortrait) {
+                this._rotateDismissed = false; // Reset khi đã xoay ngang
+                ov.style.display = 'none';
+            } else if (!this._rotateDismissed) {
+                ov.style.display = 'flex';
+            }
+        };
+        const btnDismissRotate = document.getElementById('btn-dismiss-rotate');
+        if (btnDismissRotate) {
+            btnDismissRotate.onclick = () => {
+                this._rotateDismissed = true;
+                const ov = document.getElementById('mobile-rotate-overlay');
+                if (ov) ov.style.display = 'none';
+            };
+        }
+        window.addEventListener('resize', checkMobileRotate);
+        window.addEventListener('orientationchange', checkMobileRotate);
+        checkMobileRotate();
+
         // Toggle ẩn hiện bảng phím tắt
         const btnToggleKeys = document.getElementById('btn-toggle-keys');
         const keyGuideContent = document.getElementById('key-guide-content');
@@ -3908,6 +3946,52 @@ export class UIManager {
         }, 3680); // Tổng thời gian hiện đúng tối đa 4 giây (3.68s + 0.32s mờ dần)
     }
 
+    // Chỉ hiển thị đúng các nút Mobile có thể ấn được theo trạng thái hiện tại (tránh hiện nút thừa che màn hình!)
+    updateMobileTouchControlsState() {
+        const dpad = document.getElementById('mobile-dpad');
+        const actions = document.getElementById('mobile-actions');
+        if (!dpad || !actions || !this.gameplay) return;
+
+        const st = this.gameplay.state;
+        const btnStrike = document.getElementById('btn-m-strike');
+        const btnCast = document.getElementById('btn-m-cast');
+        const btnGround = document.getElementById('btn-m-ground');
+        const btnStand = document.getElementById('btn-m-stand');
+        const btnZoom = document.getElementById('btn-m-zoom');
+
+        // D-Pad 4 hướng CHỈ hiện khi đang đi bộ (ROAM) hoặc đang bo cá (FIGHTING) — ẩn hoàn toàn lúc ngồi chờ phao!
+        dpad.style.display = (st === 'ROAM' || st === 'FIGHTING') ? 'block' : 'none';
+        // Khi đang bo cá, ẩn cụm action bên phải để nhường toàn bộ không gian cho bảng Bo Cá & chiêu thức!
+        actions.style.display = (st === 'FIGHTING') ? 'none' : 'flex';
+
+        if (st === 'ROAM') {
+            if (btnStrike) btnStrike.style.display = 'none';
+            if (btnCast) btnCast.style.display = 'none';
+            if (btnGround) btnGround.style.display = 'none';
+            if (btnZoom) btnZoom.style.display = 'none';
+            const near = this.player && this.player.getNearestFishingSpot ? this.player.getNearestFishingSpot() : null;
+            if (btnStand) {
+                btnStand.style.display = (near && near.canSit) ? 'inline-flex' : 'none';
+                btnStand.innerText = '🪑 Ngồi Câu';
+            }
+        } else if (st === 'SEATED' || st === 'LANDED') {
+            if (btnStrike) btnStrike.style.display = 'none';
+            if (btnCast) btnCast.style.display = 'inline-flex';
+            if (btnGround) btnGround.style.display = 'inline-flex';
+            if (btnZoom) btnZoom.style.display = 'none';
+            if (btnStand) {
+                btnStand.style.display = 'inline-flex';
+                btnStand.innerText = '🚶 Đứng Dậy';
+            }
+        } else if (st === 'CASTING' || st === 'FLOAT_WAIT' || st === 'BITING') {
+            if (btnStrike) btnStrike.style.display = 'inline-flex';
+            if (btnCast) btnCast.style.display = 'none';
+            if (btnGround) btnGround.style.display = 'inline-flex';
+            if (btnZoom) btnZoom.style.display = 'inline-flex';
+            if (btnStand) btnStand.style.display = 'none';
+        }
+    }
+
     onRungStarted(ev, shout) {
         const banner = document.getElementById('rung-event-banner');
         const titleEl = document.getElementById('rung-banner-title');
@@ -4325,6 +4409,7 @@ export class UIManager {
         // Vận hành giờ hồ câu 24h & vé ca & đếm ngược kèo Rung & Lán Trại Đêm & Thu Chi Chủ Hồ
         this.updateOwnedLakesEconomy(delta);
         this.updateTournament(delta);
+        this.updateMobileTouchControlsState();
         if (this.lakeOps) {
             this.lakeOps.update(delta);
             if (this.lakeOps.rungEvent && this.lakeOps.rungEvent.active) {
