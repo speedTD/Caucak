@@ -4394,3 +4394,201 @@ body, html {
         display: none !important;
     }
 }
+
+/* ==================== MÀN HÌNH ĐĂNG NHẬP / ĐĂNG KÝ + THANH LOADING VÀO GAME ==================== */
+.menu-account-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 10px;
+    margin-bottom: 10px;
+    border-radius: 10px;
+    background: rgba(15, 23, 42, 0.85);
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    font-size: 12px;
+    color: #e2e8f0;
+}
+
+.btn-logout-mini {
+    padding: 5px 10px;
+    border-radius: 7px;
+    border: 1px solid rgba(239, 68, 68, 0.65);
+    background: rgba(239, 68, 68, 0.22);
+    color: #fca5a5;
+    font-size: 11.5px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.btn-logout-mini:hover {
+    background: #ef4444;
+    color: #fff;
+}
+
+.auth-screen-overlay,
+.game-loading-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10050;
+    background: radial-gradient(circle at top, rgba(14, 116, 144, 0.92), rgba(2, 6, 23, 0.97));
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+}
+
+.auth-card {
+    width: 100%;
+    max-width: 380px;
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid rgba(56, 189, 248, 0.5);
+    border-radius: 18px;
+    padding: 24px 22px;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.75);
+    text-align: center;
+    color: #f8fafc;
+}
+
+.auth-logo {
+    font-size: 20px;
+    font-weight: 900;
+    color: #fde047;
+    letter-spacing: 0.5px;
+}
+
+.auth-sub {
+    font-size: 12px;
+    color: #94a3b8;
+    margin: 6px 0 16px 0;
+}
+
+.auth-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+}
+
+.auth-tab {
+    flex: 1;
+    padding: 9px;
+    border-radius: 10px;
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    background: rgba(30, 41, 59, 0.7);
+    color: #cbd5e1;
+    font-size: 12.5px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.auth-tab.active {
+    background: linear-gradient(135deg, #0284c7, #0369a1);
+    border-color: #7dd3fc;
+    color: #fff;
+}
+
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.auth-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 11px 13px;
+    border-radius: 10px;
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    background: rgba(2, 6, 23, 0.75);
+    color: #f8fafc;
+    font-size: 13.5px;
+    outline: none;
+}
+
+.auth-input:focus {
+    border-color: #38bdf8;
+    box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25);
+}
+
+.auth-error {
+    background: rgba(239, 68, 68, 0.18);
+    border: 1px solid rgba(239, 68, 68, 0.5);
+    color: #fca5a5;
+    border-radius: 8px;
+    padding: 7px 10px;
+    font-size: 12px;
+    text-align: left;
+}
+
+.auth-submit-btn {
+    padding: 12px;
+    border-radius: 10px;
+    border: none;
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: #111827;
+    font-size: 14px;
+    font-weight: 900;
+    cursor: pointer;
+    margin-top: 2px;
+}
+
+.auth-submit-btn:hover {
+    filter: brightness(1.08);
+}
+
+.auth-hint {
+    margin-top: 14px;
+    font-size: 11.5px;
+    color: #cbd5e1;
+}
+
+.loading-box {
+    width: 100%;
+    max-width: 420px;
+    background: rgba(15, 23, 42, 0.94);
+    border: 1px solid rgba(56, 189, 248, 0.45);
+    border-radius: 16px;
+    padding: 24px 22px;
+    text-align: center;
+    color: #f8fafc;
+    box-shadow: 0 20px 55px rgba(0, 0, 0, 0.75);
+}
+
+.loading-title {
+    font-size: 17px;
+    font-weight: 900;
+    color: #fde047;
+    margin-bottom: 6px;
+}
+
+.loading-user-tag {
+    font-size: 12.5px;
+    color: #7dd3fc;
+    margin-bottom: 14px;
+    font-weight: 700;
+}
+
+.loading-bar-track {
+    width: 100%;
+    height: 14px;
+    border-radius: 999px;
+    background: rgba(30, 41, 59, 0.9);
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    overflow: hidden;
+    margin-bottom: 10px;
+}
+
+.loading-bar-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #0284c7, #38bdf8, #4ade80);
+    transition: width 0.28s ease;
+}
+
+.loading-meta-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: #cbd5e1;
+}

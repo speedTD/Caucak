@@ -113,6 +113,7 @@ export class UIManager {
         this.initDOM();
         this.bindEvents();
         this.initNetworkListeners();
+        this.initAuthFlow();
     }
 
     initDOM() {
@@ -146,6 +147,10 @@ export class UIManager {
                     <button class="btn-close" id="btn-close-main-menu">&times;</button>
                 </div>
                 <div class="menu-drawer-body">
+                    <div class="menu-account-bar" id="menu-account-bar">
+                        <span id="menu-account-name">👤 Tài khoản: <b>Khách</b></span>
+                        <button class="btn-logout-mini" id="btn-menu-logout">🚪 Đăng Xuất</button>
+                    </div>
                     <div class="menu-status-card">
                         <span class="habit-tag" id="ui-fish-habit">🫧 Tăm Cá: Đang Tụ Ổ</span>
                         <span class="condition-tag" id="ui-lake-condition" style="background: rgba(239, 68, 68, 0.22); border: 1px solid #ef4444; border-radius: 6px; padding: 4px 8px; font-weight: bold; font-size: 11.5px; cursor: pointer;" title="Bấm để xem bí kíp câu ca này">🌤️ Cá Ăn Đều</span>
@@ -888,6 +893,40 @@ export class UIManager {
                         • Dễ dàng canh từng nấc phao (bềnh cả củ / mất hình) và bấm nút <b>Giật Cần / Bo Cá</b> mượt mà!
                     </p>
                     <button class="btn-dismiss-rotate" id="btn-dismiss-rotate">Vẫn tiếp tục màn hình dọc</button>
+                </div>
+            </div>
+
+            <!-- MÀN HÌNH ĐĂNG NHẬP / ĐĂNG KÝ TÀI KHOẢN ONLINE -->
+            <div class="auth-screen-overlay" id="auth-screen-overlay" style="display: none;">
+                <div class="auth-card">
+                    <div class="auth-logo">🎣 CÂU ĐÀI 3D VIỆT NAM</div>
+                    <div class="auth-sub">Đăng nhập hoặc tạo tài khoản — Lần sau vào game tự động giữ tài khoản!</div>
+                    <div class="auth-tabs">
+                        <button class="auth-tab active" id="tab-auth-login">🔑 Đăng Nhập</button>
+                        <button class="auth-tab" id="tab-auth-register">📝 Đăng Ký Mới</button>
+                    </div>
+                    <div class="auth-form">
+                        <input type="text" id="auth-username" class="auth-input" placeholder="Tên tài khoản (3-20 ký tự)" maxlength="20" autocomplete="username" />
+                        <input type="password" id="auth-password" class="auth-input" placeholder="Mật khẩu (tối thiểu 4 ký tự)" maxlength="32" autocomplete="current-password" />
+                        <div class="auth-error" id="auth-error-msg" style="display: none;"></div>
+                        <button class="auth-submit-btn" id="btn-auth-submit">🚀 VÀO HỒ CÂU NGAY</button>
+                    </div>
+                    <div class="auth-hint">🎁 Tài khoản mới nhận ngay <b>1.000.000đ</b>, Cần Vô Danh 3.6m & Cần Trúc 5.4m!</div>
+                </div>
+            </div>
+
+            <!-- MÀN HÌNH THANH LOADING VÀO GAME (0% -> 100%) -->
+            <div class="game-loading-overlay" id="game-loading-overlay" style="display: none;">
+                <div class="loading-box">
+                    <div class="loading-title">🎣 ĐANG VÀO HỒ CÂU ĐÀI 3D...</div>
+                    <div class="loading-user-tag" id="loading-user-tag">👤 Cần thủ: ...</div>
+                    <div class="loading-bar-track">
+                        <div class="loading-bar-fill" id="loading-bar-fill" style="width: 0%;"></div>
+                    </div>
+                    <div class="loading-meta-row">
+                        <span id="loading-status-txt">Đang kết nối máy chủ hồ câu...</span>
+                        <b id="loading-percent-txt">0%</b>
+                    </div>
                 </div>
             </div>
         `;
@@ -3759,12 +3798,265 @@ export class UIManager {
 
     savePlayerProfile() {
         try {
-            localStorage.setItem('vn_carp_profile_v1', JSON.stringify({
+            const payload = {
                 playerMoney: this.playerMoney,
                 playerInventory: this.playerInventory,
                 careerStats: this.careerStats
-            }));
+            };
+            const accKey = this.currentUsername ? `vn_carp_acc_${this.currentUsername.toLowerCase()}_profile` : 'vn_carp_profile_v1';
+            localStorage.setItem(accKey, JSON.stringify(payload));
+            if (this.currentUsername) {
+                this.syncAccountSaveToServer();
+            }
         } catch (e) {}
+    }
+
+    // ==================== HỆ THỐNG TÀI KHOẢN (ĐĂNG KÝ / ĐĂNG NHẬP / LOADING / ĐĂNG XUẤT) ====================
+    initAuthFlow() {
+        this.authMode = 'LOGIN';
+        this.currentUsername = null;
+
+        const tabLogin = document.getElementById('tab-auth-login');
+        const tabReg = document.getElementById('tab-auth-register');
+        const submitBtn = document.getElementById('btn-auth-submit');
+        const userInp = document.getElementById('auth-username');
+        const passInp = document.getElementById('auth-password');
+        const errEl = document.getElementById('auth-error-msg');
+        const btnLogout = document.getElementById('btn-menu-logout');
+
+        const setAuthMode = (mode) => {
+            this.authMode = mode;
+            if (tabLogin) tabLogin.classList.toggle('active', mode === 'LOGIN');
+            if (tabReg) tabReg.classList.toggle('active', mode === 'REGISTER');
+            if (submitBtn) submitBtn.innerText = mode === 'LOGIN' ? '🔑 ĐĂNG NHẬP & VÀO GAME' : '📝 ĐĂNG KÝ & VÀO GAME';
+            if (errEl) errEl.style.display = 'none';
+        };
+
+        if (tabLogin) tabLogin.onclick = () => setAuthMode('LOGIN');
+        if (tabReg) tabReg.onclick = () => setAuthMode('REGISTER');
+
+        const doSubmit = async () => {
+            const username = (userInp ? userInp.value : '').trim();
+            const password = passInp ? passInp.value : '';
+            if (username.length < 3) {
+                if (errEl) { errEl.innerText = '⚠️ Tên tài khoản phải có ít nhất 3 ký tự!'; errEl.style.display = 'block'; }
+                return;
+            }
+            if (password.length < 4) {
+                if (errEl) { errEl.innerText = '⚠️ Mật khẩu phải có ít nhất 4 ký tự!'; errEl.style.display = 'block'; }
+                return;
+            }
+            if (errEl) errEl.style.display = 'none';
+            if (submitBtn) { submitBtn.disabled = true; submitBtn.innerText = '⏳ Đang xác thực...'; }
+
+            const endpoint = this.authMode === 'REGISTER' ? '/api/auth/register' : '/api/auth/login';
+            let ok = false;
+            let serverSaveData = null;
+            let finalUsername = username;
+
+            try {
+                const resp = await fetch(`${this.getServerApiBase()}${endpoint}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await resp.json();
+                if (!resp.ok || !data.ok) {
+                    if (errEl) { errEl.innerText = `⚠️ ${data.error || 'Đăng nhập thất bại!'}`; errEl.style.display = 'block'; }
+                    if (submitBtn) { submitBtn.disabled = false; setAuthMode(this.authMode); }
+                    return;
+                }
+                ok = true;
+                finalUsername = data.username || username;
+                serverSaveData = data.saveData || null;
+            } catch (e) {
+                // Fallback LocalStorage nếu chạy offline không có server API
+                const localUsers = JSON.parse(localStorage.getItem('vn_carp_local_users') || '{}');
+                const k = username.toLowerCase();
+                if (this.authMode === 'REGISTER') {
+                    if (localUsers[k]) {
+                        if (errEl) { errEl.innerText = '⚠️ Tài khoản này đã tồn tại!'; errEl.style.display = 'block'; }
+                        if (submitBtn) { submitBtn.disabled = false; setAuthMode(this.authMode); }
+                        return;
+                    }
+                    localUsers[k] = { username, pass: btoa(password) };
+                    localStorage.setItem('vn_carp_local_users', JSON.stringify(localUsers));
+                    ok = true;
+                } else {
+                    if (!localUsers[k] || localUsers[k].pass !== btoa(password)) {
+                        if (errEl) { errEl.innerText = '⚠️ Sai tài khoản hoặc mật khẩu!'; errEl.style.display = 'block'; }
+                        if (submitBtn) { submitBtn.disabled = false; setAuthMode(this.authMode); }
+                        return;
+                    }
+                    finalUsername = localUsers[k].username;
+                    ok = true;
+                }
+            }
+
+            if (submitBtn) { submitBtn.disabled = false; setAuthMode(this.authMode); }
+            if (ok) {
+                localStorage.setItem('vn_carp_auth_session', JSON.stringify({ username: finalUsername }));
+                const authOv = document.getElementById('auth-screen-overlay');
+                if (authOv) authOv.style.display = 'none';
+                this.enterGameWithLoading(finalUsername, serverSaveData);
+            }
+        };
+
+        if (submitBtn) submitBtn.onclick = doSubmit;
+        if (passInp) passInp.onkeydown = (e) => { if (e.key === 'Enter') doSubmit(); };
+        if (userInp) userInp.onkeydown = (e) => { if (e.key === 'Enter' && passInp) passInp.focus(); };
+
+        if (btnLogout) {
+            btnLogout.onclick = () => {
+                this.closeMainMenu();
+                this.logoutAccount();
+            };
+        }
+
+        // Kiểm tra xem lần trước đã đăng nhập tài khoản chưa -> Tự động vào lại đúng tài khoản đó kèm thanh Loading!
+        try {
+            const rawSess = localStorage.getItem('vn_carp_auth_session');
+            if (rawSess) {
+                const sess = JSON.parse(rawSess);
+                if (sess && sess.username) {
+                    this.enterGameWithLoading(sess.username, null);
+                    return;
+                }
+            }
+        } catch (e) {}
+
+        // Chưa có phiên đăng nhập -> Hiện màn hình Đăng Nhập / Đăng Ký
+        const authOv = document.getElementById('auth-screen-overlay');
+        if (authOv) authOv.style.display = 'flex';
+    }
+
+    enterGameWithLoading(username, serverSaveData = null) {
+        this.currentUsername = username;
+        const loadOv = document.getElementById('game-loading-overlay');
+        const fillEl = document.getElementById('loading-bar-fill');
+        const pctEl = document.getElementById('loading-percent-txt');
+        const stEl = document.getElementById('loading-status-txt');
+        const userTag = document.getElementById('loading-user-tag');
+        if (userTag) userTag.innerText = `👤 Cần thủ: ${username}`;
+        if (loadOv) loadOv.style.display = 'flex';
+
+        // Nạp dữ liệu riêng của tài khoản này (Tiền 1.000.000đ mặc định nếu tài khoản mới)
+        this.loadAccountData(username, serverSaveData);
+
+        const steps = [
+            { p: 24, t: 'Đang kết nối phòng hồ Online...' },
+            { p: 52, t: 'Đang tải bộ cần, trục thẻo & mồi câu của tài khoản...' },
+            { p: 80, t: 'Đang đồng bộ 1,5–2 tấn cá AI & 32 bến câu...' },
+            { p: 100, t: 'Sẵn sàng ra bến câu!' }
+        ];
+        let idx = 0;
+        const tick = () => {
+            const s = steps[idx];
+            if (fillEl) fillEl.style.width = `${s.p}%`;
+            if (pctEl) pctEl.innerText = `${s.p}%`;
+            if (stEl) stEl.innerText = s.t;
+            idx++;
+            if (idx < steps.length) {
+                setTimeout(tick, 320);
+            } else {
+                setTimeout(() => {
+                    if (loadOv) loadOv.style.display = 'none';
+                    const accLbl = document.getElementById('menu-account-name');
+                    if (accLbl) accLbl.innerHTML = `👤 Tài khoản: <b>${username}</b>`;
+                    if (this.network && typeof this.network.setPlayerName === 'function') {
+                        this.network.setPlayerName(username);
+                    }
+                    const nameInp = document.getElementById('menu-player-name');
+                    if (nameInp) nameInp.value = username;
+                    this.updateMoneyUI();
+                    this.renderOnlineLeaderboard();
+                    this.showPrompt(`👋 Chào mừng cần thủ [${username}] trở lại hồ câu!`);
+                }, 260);
+            }
+        };
+        tick();
+    }
+
+    loadAccountData(username, serverSaveData = null) {
+        const prefix = `vn_carp_acc_${username.toLowerCase()}`;
+        let prof = null;
+        try {
+            prof = (serverSaveData && serverSaveData.profile)
+                ? serverSaveData.profile
+                : JSON.parse(localStorage.getItem(`${prefix}_profile`) || 'null');
+        } catch (e) {}
+
+        if (prof && typeof prof.playerMoney === 'number') {
+            this.playerMoney = prof.playerMoney;
+            this.playerInventory = prof.playerInventory || { pt_chep_1: 5, kl_sua_ngo: 3, kl_mat_khoai: 3, kl_tuong_sua: 2, sp_luc_huong: 2 };
+            this.careerStats = prof.careerStats || { totalFish: 0, totalWeight: 0, biggestFish: 0, biggestFishName: '', rungWins: 0, momCount: 0, speciesRecords: {} };
+        } else {
+            // Tài khoản mới mặc định đúng 1.000.000đ + mồi khởi đầu + 2 cần khởi đầu!
+            this.playerMoney = 1000000;
+            this.playerInventory = { pt_chep_1: 5, kl_sua_ngo: 3, kl_mat_khoai: 3, kl_tuong_sua: 2, sp_luc_huong: 2 };
+            this.careerStats = { totalFish: 0, totalWeight: 0, biggestFish: 0, biggestFishName: '', rungWins: 0, momCount: 0, speciesRecords: {} };
+        }
+
+        // Nạp trang bị, bộ trục/phao & khế ước hồ riêng của tài khoản
+        try {
+            const eq = (serverSaveData && serverSaveData.equipmentLevels) || JSON.parse(localStorage.getItem(`${prefix}_equip`) || 'null');
+            this.equipmentLevels = eq ? { ...getDefaultEquipmentLevels(), ...eq } : getDefaultEquipmentLevels();
+            if (this.gameplay && this.gameplay.applyEquipmentUpgrades) this.gameplay.applyEquipmentUpgrades(this.equipmentLevels);
+        } catch (e) {}
+
+        try {
+            const rg = (serverSaveData && serverSaveData.rigConfig) || JSON.parse(localStorage.getItem(`${prefix}_rig`) || 'null');
+            this.rigConfig = rg ? { ...getDefaultRigState(), ...rg } : getDefaultRigState();
+            if (this.gameplay && this.gameplay.applyRigSetup) this.gameplay.applyRigSetup(this.rigConfig);
+        } catch (e) {}
+
+        try {
+            const ol = (serverSaveData && serverSaveData.ownedLakes) || JSON.parse(localStorage.getItem(`${prefix}_lakes`) || 'null');
+            this.ownedLakes = ol || getDefaultOwnedLakesState();
+        } catch (e) {}
+    }
+
+    syncAccountSaveToServer() {
+        if (!this.currentUsername) return;
+        const prefix = `vn_carp_acc_${this.currentUsername.toLowerCase()}`;
+        const saveData = {
+            profile: {
+                playerMoney: this.playerMoney,
+                playerInventory: this.playerInventory,
+                careerStats: this.careerStats
+            },
+            equipmentLevels: this.equipmentLevels,
+            rigConfig: this.rigConfig,
+            ownedLakes: this.ownedLakes
+        };
+        try {
+            localStorage.setItem(`${prefix}_equip`, JSON.stringify(this.equipmentLevels));
+            localStorage.setItem(`${prefix}_rig`, JSON.stringify(this.rigConfig));
+            localStorage.setItem(`${prefix}_lakes`, JSON.stringify(this.ownedLakes));
+        } catch (e) {}
+
+        if (this._authSaveDebounce) clearTimeout(this._authSaveDebounce);
+        this._authSaveDebounce = setTimeout(() => {
+            fetch(`${this.getServerApiBase()}/api/auth/save`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: this.currentUsername, saveData })
+            }).catch(() => {});
+        }, 800);
+    }
+
+    logoutAccount() {
+        this.savePlayerProfile();
+        this.currentUsername = null;
+        try { localStorage.removeItem('vn_carp_auth_session'); } catch (e) {}
+        document.exitPointerLock();
+        const userInp = document.getElementById('auth-username');
+        const passInp = document.getElementById('auth-password');
+        if (userInp) userInp.value = '';
+        if (passInp) passInp.value = '';
+        const authOv = document.getElementById('auth-screen-overlay');
+        if (authOv) authOv.style.display = 'flex';
+        this.showPrompt('🚪 Đã đăng xuất! Bạn có thể đăng nhập hoặc tạo tài khoản mới.');
     }
 
     openRecordsModal() {

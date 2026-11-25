@@ -1,6 +1,7 @@
 import http from 'http';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { WebSocketServer, WebSocket } from 'ws';
 
@@ -9,11 +10,34 @@ const __dirname = path.dirname(__filename);
 const DIST_DIR = path.join(__dirname, 'dist');
 const DATA_DIR = path.join(__dirname, 'data');
 const MARKET_FILE = path.join(DATA_DIR, 'world_market.json');
+const ACCOUNTS_FILE = path.join(DATA_DIR, 'accounts.json');
 const PORT = process.env.PORT || 8080;
 
 if (!fs.existsSync(DATA_DIR)) {
     fs.mkdirSync(DATA_DIR, { recursive: true });
 }
+
+function loadAccounts() {
+    try {
+        if (fs.existsSync(ACCOUNTS_FILE)) {
+            const parsed = JSON.parse(fs.readFileSync(ACCOUNTS_FILE, 'utf8'));
+            if (parsed && typeof parsed === 'object') return parsed;
+        }
+    } catch (e) {}
+    return {};
+}
+
+function saveAccounts(accs) {
+    try {
+        fs.writeFileSync(ACCOUNTS_FILE, JSON.stringify(accs, null, 2), 'utf8');
+    } catch (e) {}
+}
+
+function hashPassword(password, salt) {
+    return crypto.scryptSync(String(password), String(salt), 32).toString('hex');
+}
+
+let accountsDB = loadAccounts();
 
 function loadMarketListings() {
     try {
@@ -162,6 +186,77 @@ const server = http.createServer(async (req, res) => {
             rooms: roomSummary,
             timestamp: new Date().toISOString()
         }));
+        return;
+    }
+
+    // API TÀI KHOẢN NGƯỜI CHƠI (ĐĂNG KÝ / ĐĂNG NHẬP / LƯU TIẾN TRÌNH THEO TÀI KHOẢN)
+    if (urlPath === '/api/auth/register' && req.method === 'POST') {
+        const body = await readJsonBody(req);
+        const rawUser = String(body.username || '').trim();
+        const password = String(body.password || '');
+        const key = rawUser.toLowerCase();
+        if (rawUser.length < 3 || rawUser.length > 20) {
+            res.writeHead(400, corsHeaders);
+            res.end(JSON.stringify({ ok: false, error: 'Tên tài khoản phải từ 3 đến 20 ký tự!' }));
+            return;
+        }
+        if (password.length < 4) {
+            res.writeHead(400, corsHeaders);
+            res.end(JSON.stringify({ ok: false, error: 'Mật khẩu phải có ít nhất 4 ký tự!' }));
+            return;
+        }
+        if (accountsDB[key]) {
+            res.writeHead(409, corsHeaders);
+            res.end(JSON.stringify({ ok: false, error: 'Tên tài khoản này đã tồn tại! Hãy chọn tên khác hoặc chuyển sang Đăng Nhập.' }));
+            return;
+        }
+        const salt = crypto.randomBytes(12).toString('hex');
+        const passHash = hashPassword(password, salt);
+        accountsDB[key] = {
+            username: rawUser,
+            salt,
+            passHash,
+            createdAt: Date.now(),
+            saveData: null
+        };
+        saveAccounts(accountsDB);
+        res.writeHead(200, corsHeaders);
+        res.end(JSON.stringify({ ok: true, username: rawUser, saveData: null }));
+        return;
+    }
+
+    if (urlPath === '/api/auth/login' && req.method === 'POST') {
+        const body = await readJsonBody(req);
+        const rawUser = String(body.username || '').trim();
+        const password = String(body.password || '');
+        const key = rawUser.toLowerCase();
+        const acc = accountsDB[key];
+        if (!acc) {
+            res.writeHead(404, corsHeaders);
+            res.end(JSON.stringify({ ok: false, error: 'Tài khoản không tồn tại! Bạn hãy bấm tab Đăng Ký để tạo mới.' }));
+            return;
+        }
+        const checkHash = hashPassword(password, acc.salt);
+        if (checkHash !== acc.passHash) {
+            res.writeHead(401, corsHeaders);
+            res.end(JSON.stringify({ ok: false, error: 'Mật khẩu không đúng! Vui lòng kiểm tra lại.' }));
+            return;
+        }
+        res.writeHead(200, corsHeaders);
+        res.end(JSON.stringify({ ok: true, username: acc.username, saveData: acc.saveData || null }));
+        return;
+    }
+
+    if (urlPath === '/api/auth/save' && req.method === 'POST') {
+        const body = await readJsonBody(req);
+        const key = String(body.username || '').trim().toLowerCase();
+        if (key && accountsDB[key] && body.saveData) {
+            accountsDB[key].saveData = body.saveData;
+            accountsDB[key].updatedAt = Date.now();
+            saveAccounts(accountsDB);
+        }
+        res.writeHead(200, corsHeaders);
+        res.end(JSON.stringify({ ok: true }));
         return;
     }
 
