@@ -338,7 +338,7 @@ wss.on('connection', (ws) => {
     });
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
     console.log(`🎣 Vietnam Carp Fishing 3D Server (Web + Online Multiplayer) đang chạy tại port: ${PORT}`);
     console.log(`👉 Mở game: http://localhost:${PORT}`);
     console.log(`👉 Health check: http://localhost:${PORT}/api/health`);

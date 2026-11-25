@@ -3,9 +3,6 @@ services:
     name: vietnam-carp-fishing-3d
     runtime: node
     plan: free
-    buildCommand: npm install && npm run build
+    buildCommand: npm install --include=dev && npm run build
     startCommand: npm start
     healthCheckPath: /api/health
-    envVars:
-      - key: NODE_ENV
-        value: production
