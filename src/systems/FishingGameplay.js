@@ -1210,13 +1210,14 @@ export class FishingGameplay {
         this.activeMainLineSpec = getLineSpec(rigConfig.mainLineSize);
         this.activeLeaderSpec = getLineSpec(rigConfig.leaderSize);
 
-        // 1. Điều chỉnh độ nổi mặt nước (equilibriumFloatY) theo đúng kiểu Cân Phao (1 nấc -> 11 nấc / câu lửng)
-        const marks = this.activeCalibration ? this.activeCalibration.visibleMarks : 3;
-        // 1 nấc nổi ít (-0.31), 3 nấc (-0.25), 6 nấc (-0.16), 10-11 nấc (-0.04)
-        this.equilibriumFloatY = THREE.MathUtils.clamp(-0.34 + marks * 0.028, -0.32, -0.03);
+        // 1. Điều chỉnh độ nổi mặt nước (equilibriumFloatY) CHÍNH XÁC TỪNG MILIMET theo hình học tăm phao 11 nấc (markHeight = 0.032m, đỉnh tăm y = 0.352m):
+        // Để nổi chính xác N nấc trên mặt nước (y = 0): equilibriumFloatY = -0.352 + N * 0.032
+        const isHoDau = rigConfig.fishingStyle === 'HO_DAU';
+        const marks = isHoDau ? 2.2 : (this.activeCalibration ? this.activeCalibration.visibleMarks : 3);
+        this.equilibriumFloatY = THREE.MathUtils.clamp(-0.352 + marks * 0.032, -0.325, 0.005);
         const pipTag = document.getElementById('pip-float-status');
         if (pipTag && this.activeCalibration) {
-            pipTag.innerText = this.activeCalibration.shortTag;
+            pipTag.innerText = isHoDau ? '⚓ Hố Đấu (2,2 nấc)' : this.activeCalibration.shortTag;
         }
 
         // 2. Xác định Cần đang cầm (Cần Vô Danh 3m6 tải 5kg / Cần Trúc 5m4 tải 7kg / hoặc Cần đã nâng cấp trong Xưởng)
@@ -3542,10 +3543,21 @@ export class FishingGameplay {
                     lookY = THREE.MathUtils.lerp(0.03, 0.08, t);
                 } else {
                     const t = Math.min(1.0, (this.castElapsed - 2.15) / 1.60);
-                    camDist = THREE.MathUtils.lerp(1.55, 1.25, t);
-                    camHeight = THREE.MathUtils.lerp(0.30, 0.26, t);
-                    lookY = THREE.MathUtils.lerp(0.08, 0.09, t);
+                    const visMarks = (this.rigConfig && this.rigConfig.fishingStyle === 'HO_DAU')
+                        ? 2.2
+                        : (this.activeCalibration ? this.activeCalibration.visibleMarks : 3);
+                    const finalDist = visMarks >= 8 ? 2.15 : (visMarks >= 5 ? 1.55 : 1.25);
+                    camDist = THREE.MathUtils.lerp(1.65, finalDist, t);
+                    camHeight = THREE.MathUtils.lerp(0.28, visMarks >= 8 ? 0.34 : 0.20, t);
+                    lookY = THREE.MathUtils.lerp(0.04, 0.0, t); // Khớp chuẩn vạch MẶT NƯỚC tại đúng y = 0.00m!
                 }
+            } else {
+                const visMarks = (this.rigConfig && this.rigConfig.fishingStyle === 'HO_DAU')
+                    ? 2.2
+                    : (this.activeCalibration ? this.activeCalibration.visibleMarks : 3);
+                camDist = visMarks >= 8 ? 2.15 : (visMarks >= 5 ? 1.55 : 1.25);
+                camHeight = visMarks >= 8 ? 0.34 : 0.20;
+                lookY = 0.0; // Khớp chuẩn đường MẶT NƯỚC ở giữa kính ngắm với đúng mặt nước 3D (y = 0)!
             }
 
             this.pipCamera.position.set(

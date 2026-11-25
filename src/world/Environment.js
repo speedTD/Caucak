@@ -1812,29 +1812,62 @@ export class Environment {
     }
 
     createPiersAndPegs() {
-        // 16 BẾN CÂU ĐÀI RỘNG RÃI BỐ TRÍ QUANH CẢ 4 BỜ HỒ (170m x 44m) — THOẢI MÁI CHO NHIỀU NGƯỜI CHƠI ONLINE CÙNG NGỒI!
-        this.fishingSpots = [
-            // BỜ NAM (6 bến)
-            { id: 'spot_1',  name: 'Bến Đài Chính #01 (Bờ Nam Giữa)',      desc: 'Tầm nhìn trực diện bến VIP bờ Bắc & hàng quạt nước tim hồ', pos: new THREE.Vector3(0, 0.1, 18.0),    targetLook: new THREE.Vector3(0, 0, -22) },
-            { id: 'spot_2',  name: 'Bến Rặng Tre #02 (Bờ Nam Đông)',        desc: 'Góc Đông bờ Nam, gần luồng cá cũ di chuyển về cuối hồ',     pos: new THREE.Vector3(24.0, 0.1, 18.0), targetLook: new THREE.Vector3(24.0, 0, -22) },
-            { id: 'spot_3',  name: 'Bến Góc Cuối Nam #03 (Bờ Nam Cuối Hồ)', desc: 'Sát khu vực Cuối Hồ — chuyên săn Chép Lợn & Trắm Đen tụ ổ', pos: new THREE.Vector3(48.0, 0.1, 18.0), targetLook: new THREE.Vector3(48.0, 0, -22) },
-            { id: 'spot_4',  name: 'Bến Mép Quạt #04 (Bờ Nam Tây)',         desc: 'Nằm gần quạt nước oxy, nước mát cá mới bồi hay lượn qua',   pos: new THREE.Vector3(-22.0, 0.1, 18.0),targetLook: new THREE.Vector3(-22.0, 0, -22) },
-            { id: 'spot_5',  name: 'Bến Vịnh Sen #05 (Bờ Tây Nam)',         desc: 'Mặt nước phẳng lặng dễ soi tăm phao, ít sóng gió',          pos: new THREE.Vector3(-44.0, 0.1, 18.0),targetLook: new THREE.Vector3(-44.0, 0, -22) },
-            { id: 'spot_6',  name: 'Bến Cổng Vào #06 (Góc Tây Nam)',        desc: 'Bến đầu hồ phía Tây Nam, rất dễ chạy chỗ nhanh đầu ca',     pos: new THREE.Vector3(-64.0, 0.1, 18.0),targetLook: new THREE.Vector3(-64.0, 0, -22) },
-            // BỜ ĐÔNG — CUỐI HỒ SĂN CÁ CŨ (2 bến)
-            { id: 'spot_7',  name: 'Bến Cuối Hồ #07 (Đầu Hồi Đông Nam)',    desc: 'Điểm nóng Cuối Hồ: Cá cũ >5 ngày tụ đàn cày tăm dày đặc!',  pos: new THREE.Vector3(81.0, 0.1, 8.0),  targetLook: new THREE.Vector3(-20, 0, 8.0) },
-            { id: 'spot_8',  name: 'Bến Cuối Hồ #08 (Đầu Hồi Đông Bắc)',    desc: 'Rãnh sâu Cuối Hồ chuyên săn Trắm Đen & Chép Lợn bằng Hố Đấu',pos: new THREE.Vector3(81.0, 0.1, -8.0), targetLook: new THREE.Vector3(-20, 0, -8.0) },
-            // BỜ BẮC (6 bến)
-            { id: 'spot_9',  name: 'Bến Bờ Bắc VIP #09 (Cuối Hồ Bắc)',      desc: 'Bến VIP góc Đông Bắc nhìn trọn cuối hồ, cá lớn ăn dọc kè',  pos: new THREE.Vector3(64.0, 0.1, -18.0),targetLook: new THREE.Vector3(64.0, 0, 22) },
-            { id: 'spot_10', name: 'Bến Nhà Lán #10 (Bờ Bắc Đông)',         desc: 'Gần khu chủ hồ đổ xe bồi cá, cá mới cực kỳ sung sức',       pos: new THREE.Vector3(42.0, 0.1, -18.0),targetLook: new THREE.Vector3(42.0, 0, 22) },
-            { id: 'spot_11', name: 'Bến Đối Diện #11 (Bờ Bắc Giữa Đông)',   desc: 'Đối diện bến chính bờ Nam, nước sâu êm ít động ổ',          pos: new THREE.Vector3(16.0, 0.1, -18.0),targetLook: new THREE.Vector3(16.0, 0, 22) },
-            { id: 'spot_12', name: 'Bến Chòi Lá #12 (Bờ Bắc Giữa Tây)',     desc: 'Cạnh chòi lá mát mẻ, cá đi tuần ven bờ rất đều',            pos: new THREE.Vector3(-18.0, 0.1, -18.0),targetLook: new THREE.Vector3(-18.0, 0, 22) },
-            { id: 'spot_13', name: 'Bến Bóng Dừa #13 (Bờ Tây Bắc)',         desc: 'Dưới tán cây xanh mát, buổi trưa cá lớn hay rúc bóng râm',  pos: new THREE.Vector3(-42.0, 0.1, -18.0),targetLook: new THREE.Vector3(-42.0, 0, 22) },
-            { id: 'spot_14', name: 'Bến Góc Liễu #14 (Góc Tây Bắc)',        desc: 'Góc yên tĩnh đầu hồ, cực hợp câu lửng Trắm Cỏ & Rô Phi',    pos: new THREE.Vector3(-64.0, 0.1, -18.0),targetLook: new THREE.Vector3(-64.0, 0, 22) },
-            // BỜ TÂY — ĐẦU HỒ (2 bến)
-            { id: 'spot_15', name: 'Bến Cội Liễu #15 (Đầu Hồi Tây Nam)',    desc: 'Bóng liễu rủ mát rượi đầu hồi phía Tây',                    pos: new THREE.Vector3(-81.0, 0.1, 8.0), targetLook: new THREE.Vector3(20, 0, 8.0) },
-            { id: 'spot_16', name: 'Bến Cội Liễu #16 (Đầu Hồi Tây Bắc)',    desc: 'Đầu hồi phía Tây Bắc, gió mát nhẹ & cá đi ven bờ liên tục', pos: new THREE.Vector3(-81.0, 0.1, -8.0),targetLook: new THREE.Vector3(20, 0, -8.0) }
-        ];
+        // 32 CHỖ NGỒI CÂU ĐÀI RỘNG RÃI BỐ TRÍ ĐỀU QUANH CẢ 4 BỜ HỒ (12 Bờ Nam + 12 Bờ Bắc + 4 Cuối Hồ Đông + 4 Đầu Hồ Tây)
+        this.fishingSpots = [];
+        let spotNum = 1;
+        const pad2 = (n) => String(n).padStart(2, '0');
+
+        // 12 BẾN BỜ NAM (x: -70 -> +70, z = 18.0)
+        for (let i = 0; i < 12; i++) {
+            const x = Number((-70 + (140 / 11) * i).toFixed(1));
+            const zone = x >= 35 ? 'Cuối Hồ Nam' : (x <= -35 ? 'Đầu Hồ Nam' : 'Giữa Bờ Nam');
+            this.fishingSpots.push({
+                id: `spot_${spotNum}`,
+                name: `Bến #${pad2(spotNum)} (${zone})`,
+                desc: x >= 35 ? 'Gần vùng Cuối Hồ — hay có cá cũ >5 ngày tụ tăm săn Ốc/Ngô' : 'Bờ Nam nhìn trực diện sang bờ Bắc, tầm đánh thoáng đẹp',
+                pos: new THREE.Vector3(x, 0.1, 18.0),
+                targetLook: new THREE.Vector3(x, 0, -22)
+            });
+            spotNum++;
+        }
+
+        // 4 BẾN BỜ ĐÔNG — CUỐI HỒ SĂN CÁ CŨ / TRẮM ĐEN / CHÉP LỢN (x = 81.0, z: -12, -4, +4, +12)
+        [-12, -4, 4, 12].forEach((z) => {
+            this.fishingSpots.push({
+                id: `spot_${spotNum}`,
+                name: `Bến #${pad2(spotNum)} (Cuối Hồ Đông)`,
+                desc: 'Điểm nóng Cuối Hồ: Cá cũ >5 ngày tụ đàn cày tăm dày đặc, chuyên Hố Đấu săn Trắm Đen & Chép Lợn!',
+                pos: new THREE.Vector3(81.0, 0.1, z),
+                targetLook: new THREE.Vector3(-20, 0, z)
+            });
+            spotNum++;
+        });
+
+        // 12 BẾN BỜ BẮC (x: +70 -> -70, z = -18.0)
+        for (let i = 0; i < 12; i++) {
+            const x = Number((70 - (140 / 11) * i).toFixed(1));
+            const zone = x >= 35 ? 'Cuối Hồ Bắc VIP' : (x <= -35 ? 'Đầu Hồ Bắc' : 'Giữa Bờ Bắc');
+            this.fishingSpots.push({
+                id: `spot_${spotNum}`,
+                name: `Bến #${pad2(spotNum)} (${zone})`,
+                desc: x >= 35 ? 'Bờ Bắc Cuối Hồ gần nhà lán bồi cá & ổ cá cũ' : 'Bờ Bắc mát mẻ, nhìn rõ toàn bộ cần thủ bờ Nam',
+                pos: new THREE.Vector3(x, 0.1, -18.0),
+                targetLook: new THREE.Vector3(x, 0, 22)
+            });
+            spotNum++;
+        }
+
+        // 4 BẾN BỜ TÂY — ĐẦU HỒ (x = -81.0, z: -12, -4, +4, +12)
+        [-12, -4, 4, 12].forEach((z) => {
+            this.fishingSpots.push({
+                id: `spot_${spotNum}`,
+                name: `Bến #${pad2(spotNum)} (Đầu Hồ Tây)`,
+                desc: 'Bóng liễu rủ mát rượi đầu hồi phía Tây, cá đi tuần ven bờ rất đều',
+                pos: new THREE.Vector3(-81.0, 0.1, z),
+                targetLook: new THREE.Vector3(20, 0, z)
+            });
+            spotNum++;
+        });
 
         const postMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.82 });
         const keepnetMat = new THREE.MeshBasicMaterial({ color: 0x0284c7, wireframe: true, transparent: true, opacity: 0.55 });

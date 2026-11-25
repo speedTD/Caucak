@@ -287,7 +287,7 @@ export class UIManager {
             <div class="pip-float-frame" id="pip-float-frame" style="display: none;">
                 <div class="pip-header">
                     <span>🎯 KÍNH NGẮM PHAO HD</span>
-                    <span class="pip-status-tag" id="pip-float-status">Cân 7 Câu 4</span>
+                    <span class="pip-status-tag" id="pip-float-status">Cân 7 Câu 3</span>
                 </div>
                 <div class="pip-reticle-overlay">
                     <div class="pip-waterline"></div>
@@ -4394,9 +4394,12 @@ export class UIManager {
                     statusEl.className = 'pip-status-tag pip-warn';
                     if (footerEl) footerEl.innerText = 'Phao Bầu Nano: Nằm ngang ➔ Đứng ➔ Mất bầu';
                 } else {
-                    statusEl.innerText = 'Cân 7 Câu 4';
+                    const isHoDau = this.rigConfig && this.rigConfig.fishingStyle === 'HO_DAU';
+                    const cal = this.gameplay.activeCalibration;
+                    const visMarks = isHoDau ? '2,2' : (cal ? cal.visibleMarks : 3);
+                    statusEl.innerText = isHoDau ? '⚓ Hố Đấu (2,2 nấc)' : (cal ? cal.shortTag : 'Cân 7 Câu 3');
                     statusEl.className = 'pip-status-tag';
-                    if (footerEl) footerEl.innerText = 'Phao Bầu Nano 11 Nấc • Quan sát ngọn phao';
+                    if (footerEl) footerEl.innerText = `Phao Nano 11 Nấc • Nổi chuẩn ${visMarks} nấc trên mặt nước`;
                 }
             } else {
                 pipFrame.style.display = 'none';
