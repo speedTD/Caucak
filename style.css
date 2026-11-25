@@ -4337,6 +4337,7 @@ body, html {
     align-items: center;
     justify-content: center;
     padding: 20px;
+    pointer-events: auto;
 }
 
 .mobile-rotate-card {
@@ -4437,6 +4438,7 @@ body, html {
     align-items: center;
     justify-content: center;
     padding: 18px;
+    pointer-events: auto;
 }
 
 .auth-card {
@@ -4504,6 +4506,8 @@ body, html {
     color: #f8fafc;
     font-size: 13.5px;
     outline: none;
+    user-select: text;
+    -webkit-user-select: text;
 }
 
 .auth-input:focus {
@@ -4591,4 +4595,30 @@ body, html {
     justify-content: space-between;
     font-size: 12px;
     color: #cbd5e1;
+}
+
+/* ==================== NÚT GHÌ CẦN 1 CHẠM SIÊU DỄ BO CÁ (PC & MOBILE) ==================== */
+.btn-easy-hold-rod {
+    width: 100%;
+    padding: 14px 18px;
+    border-radius: 14px;
+    border: 2px solid #7dd3fc;
+    background: linear-gradient(135deg, #0284c7, #0369a1);
+    color: #ffffff;
+    font-size: 16px;
+    font-weight: 900;
+    letter-spacing: 0.4px;
+    cursor: pointer;
+    box-shadow: 0 8px 24px rgba(2, 132, 199, 0.55);
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+    transition: transform 0.1s ease, background 0.15s ease;
+}
+
+.btn-easy-hold-rod:active {
+    transform: scale(0.97);
+    background: linear-gradient(135deg, #16a34a, #15803d);
+    border-color: #86efac;
+    box-shadow: 0 0 22px rgba(34, 197, 94, 0.65);
 }

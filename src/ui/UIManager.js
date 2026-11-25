@@ -508,23 +508,14 @@ export class UIManager {
                 </div>
 
                 <div class="fight-bottom-controls">
-                    <div class="fight-arrow-pad">
-                        <button class="arrow-key-btn arrow-left" id="btn-fight-left" title="Giữ Mũi Tên Trái / A">
-                            <span class="arrow-icon">⬅️</span>
-                            <span class="arrow-lbl">Trái</span>
-                        </button>
-                        <button class="arrow-key-btn arrow-up" id="btn-fight-up" title="Giữ Mũi Tên Lên / W">
-                            <span class="arrow-icon">⬆️</span>
-                            <span class="arrow-lbl" id="lbl-fight-up">Dựng</span>
-                        </button>
-                        <button class="arrow-key-btn arrow-down" id="btn-fight-down" title="Bấm Mũi Tên Xuống / Space">
-                            <span class="arrow-icon">⬇️</span>
-                            <span class="arrow-lbl">Hớt</span>
-                        </button>
-                        <button class="arrow-key-btn arrow-right" id="btn-fight-right" title="Giữ Mũi Tên Phải / D">
-                            <span class="arrow-icon">➡️</span>
-                            <span class="arrow-lbl">Phải</span>
-                        </button>
+                    <!-- 1 NÚT GHÌ CẦN SIÊU TO DỄ BẤM 1 CHẠM (TỰ ĐỘNG GHÌM ĐÚNG HƯỚNG CÁ CHẠY!) -->
+                    <button class="btn-easy-hold-rod" id="btn-fight-up" title="Giữ nút này (hoặc Chuột Trái / W / Mũi Tên Lên) để GHÌ CẦN dễ dàng ở mọi hướng!">
+                        ✊ <span id="lbl-fight-up">GIỮ ĐỂ GHÌ CẦN</span>
+                    </button>
+                    <div style="display:none;">
+                        <button id="btn-fight-left"></button>
+                        <button id="btn-fight-down"></button>
+                        <button id="btn-fight-right"></button>
                     </div>
                     <div class="fight-skills-row">
                         <button class="btn-fight-skill btn-skill-ngulong" id="btn-skill-ngulong" title="Xoáy cần vòng tròn phá hướng cá phi thẳng (Phím Q)">🐉 NGỰ LONG (Q)</button>

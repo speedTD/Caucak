@@ -2512,60 +2512,50 @@ export class FishingGameplay {
                 }
             }
 
-            const tensionClimbRate = (this.phaseGraceTimer > 0) ? -0.04 : ((0.072 + power * 0.032) * rodTensionMul * overloadMul);
+            const tensionClimbRate = (this.phaseGraceTimer > 0) ? -0.05 : ((0.055 + power * 0.024) * rodTensionMul * overloadMul);
 
             if (this.fightPhase === FIGHT_PHASES.RUN_OUT) {
                 if (keyUp) {
                     isCounteringCorrectly = true;
-                    this.fishStamina -= (0.24 + (1 - power) * 0.08) * rodDrainMul * delta;
-                    this.fishDistance = Math.max(2.3, this.fishDistance - 0.55 * delta);
-                    this.lineTension += (0.58 - this.lineTension) * delta * 3.5;
-                    actionFeedback = '✅ Đang DỰNG CẦN chuẩn xác! 5 lóng cần uốn cong chữ C chịu tải cho thẻo!';
+                    this.fishStamina -= (0.28 + (1 - power) * 0.09) * rodDrainMul * delta;
+                    this.fishDistance = Math.max(2.3, this.fishDistance - 0.62 * delta);
+                    this.lineTension += (0.54 - this.lineTension) * delta * 3.8;
+                    actionFeedback = '✅ Đang GHÌ CẦN cực êm! 5 lóng cần uốn cong chữ C kéo cá vào bờ!';
                 } else {
-                    this.fishDistance = Math.min(11.5, this.fishDistance + (0.55 + power * 0.3) * delta);
+                    this.fishDistance = Math.min(11.5, this.fishDistance + (0.48 + power * 0.25) * delta);
                     this.lineTension += tensionClimbRate * delta;
-                    actionFeedback = '⬆️ CÁ ĐANG PHI RA NGOÀI! Hãy giữ [⬆️ MŨI TÊN LÊN] (hoặc Chuột Trái) để DỰNG CẦN!';
+                    actionFeedback = '✊ GIỮ NÚT [GHÌ CẦN] (hoặc Chuột Trái / Phím W) để ghìm cá!';
                 }
                 this.fishLateralX += (0 - this.fishLateralX) * delta * 1.2;
 
             } else if (this.fightPhase === FIGHT_PHASES.RUN_LEFT) {
-                this.fishLateralX = Math.max(-3.8, this.fishLateralX - (0.75 + power * 0.35) * delta);
+                this.fishLateralX = Math.max(-3.8, this.fishLateralX - (0.68 + power * 0.30) * delta);
 
-                if (keyLeft || keyRight) {
+                if (keyUp || keyLeft || keyRight) {
                     isCounteringCorrectly = true;
-                    this.fishStamina -= (0.24 + (1 - power) * 0.08) * rodDrainMul * delta;
-                    this.fishLateralX += 0.95 * delta;
-                    this.fishDistance = Math.max(2.3, this.fishDistance - 0.45 * delta);
-                    this.lineTension += (0.56 - this.lineTension) * delta * 3.5;
-                    actionFeedback = '✅ Đang GHÌM CẦN TRÁI cực êm! Các khớp lóng cần uốn nghiêng ép đầu cá quay lại!';
-                } else if (keyUp) {
-                    isCounteringCorrectly = true;
-                    this.fishStamina -= 0.12 * rodDrainMul * delta;
-                    this.lineTension += (0.60 - this.lineTension) * delta * 2.5;
-                    actionFeedback = '⬅️ Cá đang chạy sang Trái! Giữ thêm [⬅️ MŨI TÊN TRÁI] để ghìm đầu cá nhanh hơn!';
+                    this.fishStamina -= (0.27 + (1 - power) * 0.09) * rodDrainMul * delta;
+                    this.fishLateralX += 0.98 * delta;
+                    this.fishDistance = Math.max(2.3, this.fishDistance - 0.52 * delta);
+                    this.lineTension += (0.53 - this.lineTension) * delta * 3.8;
+                    actionFeedback = '✅ Đang GHÌ CẦN cực mượt! Ép đầu cá quay lại vào bờ!';
                 } else {
                     this.lineTension += tensionClimbRate * delta;
-                    actionFeedback = '⬅️ CÁ LAO SANG TRÁI! Hãy giữ [⬅️ MŨI TÊN TRÁI] để GHÌM CẦN!';
+                    actionFeedback = '✊ CÁ LAO SANG TRÁI — GIỮ NÚT [GHÌ CẦN] ngay!';
                 }
 
             } else if (this.fightPhase === FIGHT_PHASES.RUN_RIGHT) {
-                this.fishLateralX = Math.min(3.8, this.fishLateralX + (0.75 + power * 0.35) * delta);
+                this.fishLateralX = Math.min(3.8, this.fishLateralX + (0.68 + power * 0.30) * delta);
 
-                if (keyRight || keyLeft) {
+                if (keyUp || keyRight || keyLeft) {
                     isCounteringCorrectly = true;
-                    this.fishStamina -= (0.24 + (1 - power) * 0.08) * rodDrainMul * delta;
-                    this.fishLateralX -= 0.95 * delta;
-                    this.fishDistance = Math.max(2.3, this.fishDistance - 0.45 * delta);
-                    this.lineTension += (0.56 - this.lineTension) * delta * 3.5;
-                    actionFeedback = '✅ Đang GHÌM CẦN PHẢI chuẩn xác! Cá đang mỏi dần!';
-                } else if (keyUp) {
-                    isCounteringCorrectly = true;
-                    this.fishStamina -= 0.12 * rodDrainMul * delta;
-                    this.lineTension += (0.60 - this.lineTension) * delta * 2.5;
-                    actionFeedback = '➡️ Cá đang chạy sang Phải! Giữ thêm [➡️ MŨI TÊN PHẢI] để ghìm đầu cá!';
+                    this.fishStamina -= (0.27 + (1 - power) * 0.09) * rodDrainMul * delta;
+                    this.fishLateralX -= 0.98 * delta;
+                    this.fishDistance = Math.max(2.3, this.fishDistance - 0.52 * delta);
+                    this.lineTension += (0.53 - this.lineTension) * delta * 3.8;
+                    actionFeedback = '✅ Đang GHÌ CẦN cực mượt! Cá đang mỏi dần!';
                 } else {
                     this.lineTension += tensionClimbRate * delta;
-                    actionFeedback = '➡️ CÁ LAO SANG PHẢI! Hãy giữ [➡️ MŨI TÊN PHẢI] để GHÌM CẦN!';
+                    actionFeedback = '✊ CÁ LAO SANG PHẢI — GIỮ NÚT [GHÌ CẦN] ngay!';
                 }
             }
 
