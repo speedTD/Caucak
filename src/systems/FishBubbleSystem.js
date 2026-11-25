@@ -447,7 +447,7 @@ export class FishBubbleSystem {
         // 3. Chiến thuật lối đánh (Cân Đài / Bán Đấu / Hố Đấu giấu thẻo) theo giai đoạn ca câu
         const tactic = this.getMethodTacticBonus(calId, fish, styleId);
 
-        return THREE.MathUtils.clamp(0.32 * mixQuality * waterMult * feedFactor * tactic.mult, 0.06, 0.85);
+        return THREE.MathUtils.clamp(0.46 * mixQuality * waterMult * feedFactor * tactic.mult, 0.10, 0.90);
     }
 
     // Định nghĩa chuẩn Cá Cũ: Bất kỳ con cá nào đã được bồi / sống trong hồ từ 5 ngày trở đi (daysInLake >= 5)!
@@ -492,8 +492,8 @@ export class FishBubbleSystem {
         return {
             key: 'SLOW_FEED',
             badge: '🌤️ GIỜ ĂN CHẬM',
-            desc: 'Ngoài giờ vàng (8–10h & 16–17h), cá đi ăn chậm và cầm chừng hơn.',
-            eatMul: 0.68,
+            desc: 'Ngoài giờ vàng (8–10h & 16–17h), cá đi ăn đều nhẹ và cầm chừng hơn.',
+            eatMul: 0.82,
             pressFloatOnly: false
         };
     }
@@ -916,12 +916,12 @@ export class FishBubbleSystem {
                 return;
             }
 
-            // 4. Tính xác suất thực sự hứng thú vào ổ (giới hạn tối đa ~8 con vào 1 ổ cùng lúc để không bị đông quá giả!)
-            let attractProb = 0.16 + (fish.hunger || 0.5) * 0.26;
-            if (fish.isFresh) attractProb += 0.12;
-            if (this.isOldResidentFish(fish) && dist > 14.0) attractProb *= 0.38; // Cá cũ thích tụ cuối hồ, ít chịu bỏ chỗ chạy xa
+            // 4. Tính xác suất thực sự hứng thú vào ổ (cân bằng vừa tay: tối đa ~14 con rẽ vào ổ cùng lúc)
+            let attractProb = 0.24 + (fish.hunger || 0.5) * 0.32;
+            if (fish.isFresh) attractProb += 0.14;
+            if (this.isOldResidentFish(fish) && dist > 14.0) attractProb *= 0.42; // Cá cũ thích tụ cuối hồ, ít chịu bỏ chỗ chạy xa
 
-            if (enteredCount < 8 && Math.random() < attractProb) {
+            if (enteredCount < 14 && Math.random() < attractProb) {
                 fish.aiState = AI_FISH_STATES.SMELL_SEEK;
                 fish.targetX = x + (Math.random() - 0.5) * 2.8;
                 fish.targetZ = z + (Math.random() - 0.5) * 2.8;
@@ -1331,7 +1331,7 @@ export class FishBubbleSystem {
             * (feedWin.eatMul || 1.0) * snailCornRigBonus * collapsedMul * tacticBonus.mult * hoDauDetailMul
             * (fish.isFresh ? 1.25 : 1.0);
 
-        const pCommit = THREE.MathUtils.clamp(desireScore * 0.46, 0.02, 0.88);
+        const pCommit = THREE.MathUtils.clamp(desireScore * 0.58, 0.03, 0.92);
         if (Math.random() < pCommit) {
             if (isSavedFromMom) {
                 soundManager.playBellSound && soundManager.playBellSound();
@@ -1682,7 +1682,7 @@ export class FishBubbleSystem {
                     const hasGround = this.hasGroundBaitNear(this.activeHookTarget.x, this.activeHookTarget.z);
                     const scentRadius = (isSlowMode ? 9.5 : 15.5) * (this.activeHookTarget.waterEffectMultiplier || 1.0) * (hasGround ? 1.15 : 0.55);
 
-                    if (dHook < scentRadius && activeInspectorCount < (isSlowMode ? 1 : 2) && this.getFishAffinity(fish) > 0.18) {
+                    if (dHook < scentRadius && activeInspectorCount < (isSlowMode ? 2 : 3) && this.getFishAffinity(fish) > 0.18) {
                         if (dHook < 2.3) {
                             // CÁ VỪA BƠI VÀO TỚI RÌA Ổ CÂU (dHook < 2.3m):
                             // Hệ thống Ý Thức Cá Nhân quyết định cá sẽ làm gì (Không phải cứ vào là ăn!)
@@ -1713,7 +1713,7 @@ export class FishBubbleSystem {
                                 fish.nudgeCooldown = 0.6;
                                 activeInspectorCount++;
                             }
-                        } else if (activeSeekerCount < 10) {
+                        } else if (activeSeekerCount < 18) {
                             // Nếu là cá nhát/cá bể hoặc ổ đang cảnh giác cao -> có thể chê dây/nhát quay đầu ngay ở rìa ngoài!
                             if ((fish.caution >= 0.66 || this.spotAlertLevel >= 0.45) && dHook < 5.0 && Math.random() < 0.015) {
                                 fish.aiState = AI_FISH_STATES.REJECT_TURN;
@@ -1744,7 +1744,7 @@ export class FishBubbleSystem {
                             bestSpot = null;
                         }
                     }
-                    if (bestSpot && activeSeekerCount < 12) {
+                    if (bestSpot && activeSeekerCount < 18) {
                         fish.aiState = AI_FISH_STATES.SMELL_SEEK;
                         activeSeekerCount++;
                         desiredSpeed = fish.baseSpeed * (isSlowMode ? 0.75 : 1.25);
@@ -1753,7 +1753,7 @@ export class FishBubbleSystem {
                             fish.targetZ = bestSpot.z + (Math.random() - 0.5) * 2.2;
                         }
                     }
-                } else if (!isDisinterested && this.groundBaitSpots.length > 0 && activeSeekerCount < 10 && Math.random() < 0.0025 * this.computeSpotDrawRate(fish)) {
+                } else if (!isDisinterested && this.groundBaitSpots.length > 0 && activeSeekerCount < 16 && Math.random() < 0.004 * this.computeSpotDrawRate(fish)) {
                     // Tỷ lệ nhỏ cá đang đi tuần quanh hồ tự chọn 1 ổ mồi xả bất kỳ để rẽ vào thăm dò!
                     const chosen = this.groundBaitSpots[Math.floor(Math.random() * this.groundBaitSpots.length)];
                     fish._decidedSpotId = chosen.id;
