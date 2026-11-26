@@ -1,5 +1,6 @@
 import { soundManager } from '../audio/SoundManager.js';
 import { BRANDS } from '../data/BaitShopData.js';
+import { FISHING_MODES } from '../systems/BaitMixingSystem.js';
 import { LAKES_DATA, assignRandomTerrainsToLakes } from '../data/LakesData.js';
 import { getFishImageUrl } from '../data/FishProfiles.js';
 import { EQUIPMENT_CATEGORIES, getDefaultEquipmentLevels, getEquippedTier, computeEquipmentBonuses } from '../data/EquipmentUpgradeData.js';
@@ -7,6 +8,14 @@ import { STARTER_RODS, FLOAT_CALIBRATIONS, FISHING_STYLES, LINE_SIZES, MAIN_LINE
 import { LAKE_DEEDS, INITIAL_WORLD_MARKET_LISTINGS, getDefaultOwnedLakesState } from '../data/WorldMarketData.js';
 import { NET_EVENTS } from '../network/NetworkManager.js';
 import { LakeOperations } from '../systems/LakeOperations.js';
+import {
+    renderRodModelSVG,
+    renderLineSpoolSVG,
+    renderEquipmentPreviewSVG,
+    renderShopItemSVG,
+    renderMixingBasinSVG,
+    renderRigWaterTankSVG
+} from './GearVisualRenderer.js';
 
 export class UIManager {
     constructor(gameplay, mixingSystem, bubbleSystem, player, environment, shopItems, onLakeChange, network) {
@@ -22,16 +31,7 @@ export class UIManager {
         // Kinh tế
         this.playerMoney = 1000000; // Mặc định mỗi người chơi mới nhận 1.000.000đ để đi câu!
         this.leaderboardMode = 'HUGO'; // BXH mặc định: HUGO (Cá to nhất) | MONEY (Tiền) | MOM (Móm Ca) | WEIGHT (Tổng cân)
-        this.playerInventory = {
-            'pt_moi_chep_so_1': 5,
-            'kl_sua_ngo': 2,
-            'kl_mat_khoai': 1,
-            'sp_luc_huong': 1,
-            'sp_sua_non': 1,
-            'vc_khoai': 1,
-            'vc_trung_sua': 1,
-            'guf_bo_ba_san_hang': 1
-        };
+        this.playerInventory = this.getDefaultBaitInventory();
         this.fishKeepnet = [];
         this.careerStats = {
             totalFish: 0,
@@ -477,52 +477,91 @@ export class UIManager {
                 </div>
             </div>
 
-            <!-- Fight HUD Gọn Nhẹ Trong Suốt (Không che tầm nhìn cá chạy rẽ nước & nhảy Santo) -->
+            <!-- Fight HUD Tinh Gọn: Thanh Cân Bằng Mảnh Trên Cao + NÚT HÌNH TRÒN GHÌ & BO CÁ 360° GẦN GIỮA MÀN HÌNH -->
             <div class="fight-hud" id="fight-hud" style="display: none;">
-                <div class="fight-top-strip" id="fight-dir-banner">
-                    <span class="fight-fish-name" id="fight-fish-name">🐟 Cá Chép Củ (8.5kg)</span>
-                    <span class="dir-phase-badge" id="fight-phase-badge">⬆️ DỰNG CẦN</span>
-                    <span class="fight-distance" id="fight-dist">6.2m</span>
-                </div>
-                <span id="fight-feedback-text" style="display:none;"></span>
+                <div class="fight-top-hud-card">
+                    <div class="fight-top-strip" id="fight-dir-banner">
+                        <span class="fight-fish-name" id="fight-fish-name">🐟 Cá Chép Củ (8.5kg)</span>
+                        <span class="dir-phase-badge" id="fight-phase-badge">▲ GHÌ LÊN</span>
+                        <span class="fight-distance" id="fight-dist">6.2m</span>
+                    </div>
+                    <span id="fight-feedback-text" style="display:none;"></span>
 
-                <div class="fight-bars-row">
-                    <div class="compact-meter">
-                        <span class="meter-label">Căng cước</span>
-                        <div class="tension-bar-bg">
-                            <div class="tension-bar-fill" id="tension-fill"></div>
+                    <!-- THANH VẠCH CÂN BẰNG LỰC BO TRÁI / BO PHẢI -->
+                    <div class="balance-gauge-box" id="balance-gauge-box">
+                        <div class="balance-gauge-header">
+                            <span class="bal-side-lbl bal-left-lbl">◀ BO TRÁI</span>
+                            <span class="bal-status-text" id="balance-hint-text">⚖️ Giữ kim ở VÙNG XANH GIỮA</span>
+                            <span class="bal-side-lbl bal-right-lbl">BO PHẢI ▶</span>
+                        </div>
+                        <div class="balance-track" id="balance-track">
+                            <div class="balance-zone-sweet"></div>
+                            <div class="balance-center-tick"></div>
+                            <div class="balance-fish-vector" id="balance-fish-vector"></div>
+                            <div class="balance-needle" id="balance-needle"></div>
                         </div>
                     </div>
-                    <div class="compact-meter">
-                        <span class="meter-label">Sức cá</span>
-                        <div class="stamina-bar-bg">
-                            <div class="stamina-bar-fill" id="stamina-fill"></div>
+
+                    <div class="fight-bars-row">
+                        <div class="compact-meter">
+                            <span class="meter-label">Căng cước</span>
+                            <div class="tension-bar-bg">
+                                <div class="tension-bar-fill" id="tension-fill"></div>
+                            </div>
                         </div>
-                    </div>
-                    <div class="compact-meter" id="surface-meter-box" style="display: none;">
-                        <span class="meter-label">Độ nổi <b id="surface-pct">0%</b></span>
-                        <div class="surface-bar-bg">
-                            <div class="surface-bar-fill" id="surface-fill"></div>
+                        <div class="compact-meter">
+                            <span class="meter-label">Sức cá</span>
+                            <div class="stamina-bar-bg">
+                                <div class="stamina-bar-fill" id="stamina-fill"></div>
+                            </div>
+                        </div>
+                        <div class="compact-meter" id="surface-meter-box" style="display: none;">
+                            <span class="meter-label">Độ nổi <b id="surface-pct">0%</b></span>
+                            <div class="surface-bar-bg">
+                                <div class="surface-bar-fill" id="surface-fill"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="fight-bottom-controls">
-                    <!-- 1 NÚT GHÌ CẦN SIÊU TO DỄ BẤM 1 CHẠM (TỰ ĐỘNG GHÌM ĐÚNG HƯỚNG CÁ CHẠY!) -->
-                    <button class="btn-easy-hold-rod" id="btn-fight-up" title="Giữ nút này (hoặc Chuột Trái / W / Mũi Tên Lên) để GHÌ CẦN dễ dàng ở mọi hướng!">
-                        ✊ <span id="lbl-fight-up">GIỮ ĐỂ GHÌ CẦN</span>
-                    </button>
-                    <div style="display:none;">
-                        <button id="btn-fight-left"></button>
-                        <button id="btn-fight-down"></button>
-                        <button id="btn-fight-right"></button>
+                <!-- NÚT HÌNH TRÒN GHÌ & BO CÁ ĐA HƯỚNG (HIỆN GẦN GIỮA MÀN HÌNH) -->
+                <div class="fight-circle-zone" id="fight-circle-zone">
+                    <div class="fight-circle-pad" id="fight-circle-pad">
+                        <div class="fc-crosshair-h"></div>
+                        <div class="fc-crosshair-v"></div>
+                        <div class="fc-inner-ring"></div>
+
+                        <div class="fc-sector fc-up" id="btn-fight-up">
+                            <span class="fc-arr">▲</span>
+                            <span class="fc-lbl" id="lbl-fight-up">GHÌ LÊN</span>
+                        </div>
+                        <div class="fc-sector fc-left" id="btn-fight-left">
+                            <span class="fc-arr">◀</span>
+                            <span class="fc-lbl">TRÁI</span>
+                        </div>
+                        <div class="fc-sector fc-right" id="btn-fight-right">
+                            <span class="fc-lbl">PHẢI</span>
+                            <span class="fc-arr">▶</span>
+                        </div>
+                        <div class="fc-sector fc-down" id="btn-fight-down">
+                            <span class="fc-lbl" id="lbl-fight-down">HẠ NHẢ</span>
+                            <span class="fc-arr">▼</span>
+                        </div>
+
+                        <!-- Núm Tròn Tâm Kéo Mượt 360° -->
+                        <div class="fc-knob" id="fight-circle-knob">
+                            <span class="fc-knob-ico" id="fc-knob-ico">✊</span>
+                            <span class="fc-knob-txt" id="fc-knob-txt">GHÌ & BO</span>
+                        </div>
                     </div>
-                    <div class="fight-skills-row">
-                        <button class="btn-fight-skill btn-skill-ngulong" id="btn-skill-ngulong" title="Xoáy cần vòng tròn phá hướng cá phi thẳng (Phím Q)">🐉 NGỰ LONG (Q)</button>
-                        <button class="btn-fight-skill btn-skill-hangu" id="btn-skill-hangu" title="Dìm cần xuống nước để cá quay đầu vào bờ (Phím C)">🌊 HẠ NGƯ (C)</button>
-                        <button class="btn-fight-skill btn-skill-leash" id="btn-skill-leash" style="background:linear-gradient(135deg,#f59e0b,#d97706);border-color:#fde047;color:#111827;" title="Bung cần theo dây bảo hiểm co giãn cứu gãy lóng & xả 52% căng dây (Phím X)">🪢 BẢO HIỂM (X)</button>
+
+                    <button class="btn-net-fish-round" id="btn-net-action" style="display: none;" disabled>🕸️ HỚT CÁ VÀO VỢT (SPACE)</button>
+
+                    <div class="fight-mini-skills-arc">
+                        <button class="btn-mini-skill" id="btn-skill-ngulong" title="Xoáy cần Ngự Long phá hướng cá chạy thẳng (Phím Q)">🐉 Q</button>
+                        <button class="btn-mini-skill" id="btn-skill-hangu" title="Dìm cần Hạ Ngư giảm căng sâu (Phím C)">🌊 C</button>
+                        <button class="btn-mini-skill btn-mini-leash" id="btn-skill-leash" title="Thả Dây Bảo Hiểm cứu cần & xả 52% căng cước (Phím X)">🪢 X</button>
                     </div>
-                    <button class="btn-net-fish" id="btn-net-action" disabled>🕸️ HỚT CÁ (SPACE)</button>
                 </div>
             </div>
 
@@ -537,33 +576,67 @@ export class UIManager {
                 </div>
             </div>
 
-            <!-- Modal Pha Mồi Chuyên Nghiệp Đẳng Cấp -->
+            <!-- Modal Chậu Pha Mồi Chuyên Nghiệp: Chọn Loại Câu -> Bỏ Đồ Vào Chậu -> Pha Chế -->
             <div class="modal-overlay" id="modal-mix" style="display: none;">
                 <div class="modal-content mix-modal-content">
                     <div class="modal-header">
                         <div class="modal-header-text">
-                            <h2>🥣 THAU TRỘN MỒI CÂU ĐÀI VIỆT NAM</h2>
-                            <p class="modal-subtitle">Điều chỉnh Cám Nền • Nước • Tinh Mùi Hương Liệu chuẩn bài thi đấu</p>
+                            <h2>🥣 CHẬU PHA MỒI CÂU ĐÀI VIỆT NAM</h2>
+                            <p class="modal-subtitle">Bước 1: Chọn Loại Câu (Cám / Ốc / Ngô) • Bước 2: Bỏ nguyên liệu & hương liệu vào Chậu • Bước 3: Bấm Pha Chế</p>
                         </div>
                         <button class="btn-close" id="btn-close-mix">&times;</button>
                     </div>
 
-                    <!-- 4 BÀI MỒI MẪU CHUẨN DÂN ĐÀI (QUICK PRO RECIPES) -->
+                    <!-- BƯỚC 1: CHỌN LOẠI CÂU (CÂU CÁM / CÂU ỐC / CÂU NGÔ) -->
+                    <div class="mix-mode-selector-bar" id="mix-mode-tabs">
+                        <button class="mix-mode-tab active" data-mode="CAM">
+                            <span class="mm-ico">🥣</span>
+                            <div class="mm-txt">
+                                <b>Câu Cám</b>
+                                <small>Cám 35k/kg + Mật Khoai / Tương Sữa / Lục Hương / Sữa Ngô</small>
+                            </div>
+                        </button>
+                        <button class="mix-mode-tab" data-mode="SNAIL">
+                            <span class="mm-ico">🐚</span>
+                            <div class="mm-txt">
+                                <b>Câu Ốc (Ốc Bươu / Ốc Vặn)</b>
+                                <small>Chuẩn: 5–10 giọt Rượu Thuốc Bắc / 1kg cám</small>
+                            </div>
+                        </button>
+                        <button class="mix-mode-tab" data-mode="CORN">
+                            <span class="mm-ico">🌽</span>
+                            <div class="mm-txt">
+                                <b>Câu Ngô Ngọt</b>
+                                <small>Chuẩn: 10 bắp pha 5ml–10ml Nước Xanh</small>
+                            </div>
+                        </button>
+                    </div>
+
+                    <!-- BÀI MỒI MẪU NHANH ĐÚNG TỶ LỆ VÀNG -->
                     <div class="mix-presets-bar">
-                        <span class="preset-label">⚡ BÀI MỒI MẪU:</span>
-                        <button class="btn-preset-recipe" id="preset-chep-sapham">🌽 Chép Sa Phạm (Nước 0.8)</button>
-                        <button class="btn-preset-recipe" id="preset-tram-cugau">🐟 Trắm Đen Củ Gấu (Nước 0.7)</button>
-                        <button class="btn-preset-recipe" id="preset-rophi-xop">🌾 Rô Phi Tơi Xốp (Nước 1.0)</button>
-                        <button class="btn-preset-recipe" id="preset-boss-kimlong">🏆 Săn Boss Kim Long (Nước 0.85)</button>
+                        <span class="preset-label">⚡ BÀI MẪU CHUẨN TỶ LỆ:</span>
+                        <button class="btn-preset-recipe" id="preset-cam-quocdan">🥣 Cám Chép Mật Khoai + Sữa Ngô</button>
+                        <button class="btn-preset-recipe" id="preset-cam-daugiai">🌿 Cám Lục Hương + Tương Sữa</button>
+                        <button class="btn-preset-recipe" id="preset-oc-thuocbac">🐚 Ốc Bươu Ủ Cám + 8 Giọt Rượu Thuốc Bắc</button>
+                        <button class="btn-preset-recipe" id="preset-ngo-nuocxanh">🌽 10 Bắp Ngô Ngọt + 8ml Nước Xanh</button>
                     </div>
 
                     <div class="mix-layout">
-                        <!-- Cột Trái: Chọn Cám/Ngô/Ốc & Tinh Mùi -->
+                        <!-- Cột Trái: Chậu Trộn Mồi Trực Quan + Kệ Bỏ Nguyên Liệu & Hương Liệu Vào Chậu -->
                         <div class="mix-left">
-                            <div class="section-title">1. Chọn Mồi Nền (Cám / Ngô Ủ / Ốc Ngâm)</div>
+                            <div class="basin-live-card" id="basin-live-card">
+                                <div class="basin-card-head">
+                                    <span id="basin-mode-hint">🥣 <b>Chậu Câu Cám:</b> Bỏ Cám Nền + Hương Liệu vào chậu rồi bấm Pha Chế</span>
+                                    <button class="btn-clear-basin" id="btn-clear-basin" title="Đổ sạch nguyên liệu đang bỏ nháp trong chậu">🗑️ Làm Sạch Chậu</button>
+                                </div>
+                                <div class="basin-svg-stage" id="mix-basin-svg-wrap"></div>
+                                <div class="basin-chips-list" id="mix-basin-chips"></div>
+                            </div>
+
+                            <div class="section-title" style="margin-top:10px;">1. Bỏ Nguyên Liệu Nền Vào Chậu (Cám 35k/kg • Ngô 10k/bắp • Ốc 20k/kg)</div>
                             <div class="base-select-grid" id="base-bait-list"></div>
 
-                            <div class="section-title" style="margin-top:12px;">2. Thêm Tinh Mùi & Hương Liệu (Đong Nắp)</div>
+                            <div class="section-title" style="margin-top:12px;">2. Nhỏ Hương Liệu Vào Chậu (Đúng Tỷ Lệ Tránh Nặng Mùi Đè Phao)</div>
                             <div class="flavor-controls" id="flavor-select-list"></div>
                         </div>
 
@@ -594,19 +667,19 @@ export class UIManager {
                             </div>
                             <div class="prep-option-row" style="margin-top:8px;">
                                 <span class="prep-option-label">Độ vê:</span>
-                                <button class="btn-prep-opt" data-firm="SOFT" title="Tan nhanh ~42s, bung sương cực nhạy">Mềm Bung Sương</button>
-                                <button class="btn-prep-opt active" data-firm="MEDIUM" title="Tan ~72s, cân bằng chuẩn đài">Dẻo Chuẩn</button>
-                                <button class="btn-prep-opt" data-firm="HARD" title="Tan ~110s, chống rô phi rỉa">Cứng Chống Rỉa</button>
+                                <button class="btn-prep-opt" data-firm="SOFT" title="Tan nhanh ~44s, bung sương cực nhạy">Mềm Bung Sương</button>
+                                <button class="btn-prep-opt active" data-firm="MEDIUM" title="Tan ~76s, cân bằng chuẩn đài">Dẻo Chuẩn</button>
+                                <button class="btn-prep-opt" data-firm="HARD" title="Tan ~115s, chống rô phi rỉa / móc chắc">Móc Chắc / Vê Chặt</button>
                             </div>
 
-                            <div class="section-title" style="margin-top:10px;">5. Đánh Giá Bài Mồi & Quy Tắc Nước</div>
+                            <div class="section-title" style="margin-top:10px;">5. Kiểm Tra Tỷ Lệ Chậu Mồi & Cảnh Báo Nặng Mùi</div>
                             <div class="recipe-analysis-card" id="recipe-analysis">
-                                <div class="water-rule-banner" id="ana-water-status">☀️ NƯỚC TRONG XANH (Trời Nắng)</div>
+                                <div class="water-rule-banner" id="ana-water-status">✅ TỶ LỆ HỢP LÝ</div>
                                 <div class="analysis-stats-grid">
-                                    <div class="score-line">Hương Liệu: <b id="ana-flavor-drops">4 nắp/giọt</b></div>
-                                    <div class="score-line">Hấp Dẫn Chép: <b id="ana-carp-score">--</b></div>
-                                    <div class="score-line">Chép Củ >5kg: <b id="ana-big-score">--</b></div>
-                                    <div class="score-line">Bán Kính Tỏa: <b id="ana-radius">-- mét</b></div>
+                                    <div class="score-line">Liều Hương: <b id="ana-flavor-drops">--</b></div>
+                                    <div class="score-line">Hấp Dẫn Cá: <b id="ana-carp-score">--</b></div>
+                                    <div class="score-line">Săn Hàng To: <b id="ana-big-score">--</b></div>
+                                    <div class="score-line">Bán Kính Ổ: <b id="ana-radius">-- mét</b></div>
                                 </div>
                                 <div class="water-rule-feedback" id="ana-water-rule-feedback"></div>
                                 <div class="combos-box" id="ana-combos"></div>
@@ -614,10 +687,10 @@ export class UIManager {
                         </div>
                     </div>
 
-                    <!-- FOOTER CỐ ĐỊNH: LUÔN HIỂN THỊ NÚT TRỘN MỒI KHÔNG CẦN CUỘN TÌM -->
+                    <!-- FOOTER CỐ ĐỊNH: BẤM PHA CHẾ TOÀN BỘ ĐỒ TRONG CHẬU -->
                     <div class="mix-footer-bar">
-                        <div class="mix-footer-summary" id="mix-footer-summary">🎯 Sẵn sàng trộn mồi & áp dụng bài cân phao</div>
-                        <button class="btn-primary-action btn-mix-confirm" id="btn-do-mix">🥣 TRỘN MỒI & ÁP DỤNG CÂN PHAO (ENTER)</button>
+                        <div class="mix-footer-summary" id="mix-footer-summary">🎯 Bỏ nguyên liệu & hương liệu vào chậu sau đó bấm Pha Chế</div>
+                        <button class="btn-primary-action btn-mix-confirm" id="btn-do-mix">🤲 NHÀO TRỘN & PHA CHẾ TRONG CHẬU (ENTER)</button>
                     </div>
                 </div>
             </div>
@@ -626,17 +699,16 @@ export class UIManager {
             <div class="modal-overlay" id="modal-shop" style="display: none;">
                 <div class="modal-content shop-modal-content">
                     <div class="modal-header">
-                        <h2>🏪 TIỆM ĐỒ CÂU ĐÀI VIỆT NAM</h2>
+                        <h2>🏪 TIỆM MỒI CÂU • HƯƠNG LIỆU & ĐỒ ĐÀI</h2>
                         <button class="btn-close" id="btn-close-shop">&times;</button>
                     </div>
                     <div class="shop-tabs">
-                        <button class="tab-btn active" data-tab="all">Tất Cả</button>
-                        <button class="tab-btn" data-tab="${BRANDS.KIM_LONG}">Kim Long</button>
-                        <button class="tab-btn" data-tab="${BRANDS.SA_PHAM}">Sa Phạm</button>
-                        <button class="tab-btn" data-tab="${BRANDS.VUA_CAU}">Vua Câu</button>
-                        <button class="tab-btn" data-tab="${BRANDS.GUF}">Gấu Vương (GUF)</button>
-                        <button class="tab-btn" data-tab="${BRANDS.PHU_THANH}">Phú Thành</button>
-                        <button class="tab-btn" data-tab="${BRANDS.EQUIPMENT}">Cần & Phao</button>
+                        <button class="tab-btn active" data-tab="all">Tất Cả (12 Loại Mồi & Hương)</button>
+                        <button class="tab-btn" data-tab="${BRANDS.BASE_CAM}">🌾 Cám Nền (35k/kg)</button>
+                        <button class="tab-btn" data-tab="${BRANDS.NATURAL_BAIT}">🌽🐚 Ngô (10k) & Ốc (20k)</button>
+                        <button class="tab-btn" data-tab="${BRANDS.FLAVOR_CAM}">🍯 Hương Pha Cám</button>
+                        <button class="tab-btn" data-tab="${BRANDS.FLAVOR_SPECIAL}">🍶🧪 Rượu Thuốc Bắc & Nước Xanh</button>
+                        <button class="tab-btn" data-tab="${BRANDS.EQUIPMENT}">🎣 Cần & Phao</button>
                     </div>
                     <div class="shop-item-grid" id="shop-items-container"></div>
                 </div>
@@ -698,27 +770,42 @@ export class UIManager {
                         </div>
 
                         <div class="rig-section">
-                            <div class="rig-sec-title">2. 📍 CHỌN KIỂU CÂN PHAO (11 Cách Cân Phao Thực Tế)</div>
-                            <div class="rig-calibs-grid" id="rig-calibs-grid"></div>
-                            <div class="rig-calib-desc" id="rig-calib-desc"></div>
+                            <div class="rig-sec-title">2. 📍 CHỌN KIỂU CÂN PHAO & MÔ PHỎNG BỂ CÂN NƯỚC 1:1</div>
+                            <div class="rig-calib-showcase">
+                                <div class="rig-calib-left">
+                                    <div class="rig-calibs-grid" id="rig-calibs-grid"></div>
+                                    <div class="rig-calib-desc" id="rig-calib-desc"></div>
+                                </div>
+                                <div class="rig-water-tank-box" id="rig-water-tank-preview"></div>
+                            </div>
                         </div>
 
                         <div class="rig-section">
                             <div class="rig-sec-title">3. 🧵 SET TRỤC & THẺO (Số 1.0 → 10.0 • Tải Tĩnh 2kg→20kg • Tải Cá 5kg→50kg)</div>
                             <div class="rig-lines-row">
                                 <div class="rig-line-card">
-                                    <div class="rig-line-head">🧵 DÂY TRỤC (39.000đ / 1 bộ)</div>
-                                    <select id="sel-main-line" class="rig-select"></select>
-                                    <div class="rig-line-spec" id="spec-main-line"></div>
+                                    <div class="rig-line-card-top">
+                                        <div class="rig-spool-visual" id="spool-main-svg"></div>
+                                        <div style="flex:1;">
+                                            <div class="rig-line-head">🧵 DÂY TRỤC (39.000đ / 1 bộ)</div>
+                                            <select id="sel-main-line" class="rig-select"></select>
+                                            <div class="rig-line-spec" id="spec-main-line"></div>
+                                        </div>
+                                    </div>
                                     <div class="rig-line-stock-row">
                                         <span id="stock-main-line">Kho: 1 bộ</span>
                                         <button class="btn-buy-rig" id="btn-buy-main-line">🛒 Mua 1 Bộ (39k)</button>
                                     </div>
                                 </div>
                                 <div class="rig-line-card">
-                                    <div class="rig-line-head">🪝 DÂY THẺO (110.000đ / 10 thẻo)</div>
-                                    <select id="sel-leader-line" class="rig-select"></select>
-                                    <div class="rig-line-spec" id="spec-leader-line"></div>
+                                    <div class="rig-line-card-top">
+                                        <div class="rig-spool-visual" id="spool-leader-svg"></div>
+                                        <div style="flex:1;">
+                                            <div class="rig-line-head">🪝 DÂY THẺO (110.000đ / 10 thẻo)</div>
+                                            <select id="sel-leader-line" class="rig-select"></select>
+                                            <div class="rig-line-spec" id="spec-leader-line"></div>
+                                        </div>
+                                    </div>
                                     <div class="rig-line-stock-row">
                                         <span id="stock-leader-line">Kho: 5 thẻo</span>
                                         <button class="btn-buy-rig" id="btn-buy-leader-line">🛒 Mua 10 Thẻo (110k)</button>
@@ -1548,27 +1635,78 @@ export class UIManager {
             this.showScenarioToast('💥 GÃY LÓNG CẦN!', 'Cần câu quá tải bị gãy lóng (Độ bền 0%)! Mở [⚙️ Trục/Phao] để Thay Lóng Cần (150.000đ)!', 'WARN');
         });
 
-        // Hỗ trợ giữ chuột trên 4 nút mũi tên Bo Cá trên màn hình
-        const bindHoldBtn = (btnId, keyProp) => {
-            const btn = document.getElementById(btnId);
-            if (!btn) return;
-            const startHold = (e) => {
+        // Xử lý kéo 360° (Trái / Phải / Lên / Xuống) trên NÚT HÌNH TRÒN GHÌ & BO CÁ gần giữa màn hình
+        this._padVisualOffset = { dx: 0, dy: 0, active: false };
+        const circlePad = document.getElementById('fight-circle-pad');
+        if (circlePad) {
+            let activePointerId = null;
+            const maxR = 54;
+
+            const updateCircleVector = (clientX, clientY, isInitialTap = false) => {
+                const rect = circlePad.getBoundingClientRect();
+                const cx = rect.left + rect.width / 2;
+                const cy = rect.top + rect.height / 2;
+                let dx = clientX - cx;
+                let dy = clientY - cy;
+                const dist = Math.hypot(dx, dy);
+
+                // Nếu cá đã ngửa bụng 100% và người chơi bấm ngay vào nút tròn -> Hớt cá luôn cho tiện!
+                if (isInitialTap && dist < 30 && this.gameplay && this.gameplay.fightPhase === 'TAP_TO_NET') {
+                    const netBtn = document.getElementById('btn-net-action');
+                    if (netBtn && !netBtn.disabled) {
+                        netBtn.click();
+                        return;
+                    }
+                }
+
+                // Nếu mới nhấn giữ ngay đúng tâm tròn (< 10px) -> Mặc định ghì dựng nhẹ lên (y = +0.72), sau đó kéo tay đi đâu bo mượt tới đó!
+                if (dist < 10) {
+                    this._padVisualOffset = { dx: 0, dy: -18, active: true };
+                    if (this.gameplay && this.gameplay.setFightPadInput) {
+                        this.gameplay.setFightPadInput(0, 0.72, true);
+                    }
+                    return;
+                }
+
+                if (dist > maxR) {
+                    dx = (dx / dist) * maxR;
+                    dy = (dy / dist) * maxR;
+                }
+                this._padVisualOffset = { dx, dy, active: true };
+                const normX = Math.max(-1, Math.min(1, dx / maxR));
+                const normY = Math.max(-1, Math.min(1, -dy / maxR)); // Kéo lên (dy < 0) => normY > 0 (Ghì lên), Kéo xuống => normY < 0 (Hạ nhả)
+                if (this.gameplay && this.gameplay.setFightPadInput) {
+                    this.gameplay.setFightPadInput(normX, normY, true);
+                }
+            };
+
+            const releaseCirclePad = (e) => {
+                if (activePointerId !== null && e && e.pointerId !== undefined && e.pointerId !== activePointerId) return;
+                activePointerId = null;
+                this._padVisualOffset = { dx: 0, dy: 0, active: false };
+                if (this.gameplay && this.gameplay.setFightPadInput) {
+                    this.gameplay.setFightPadInput(0, 0, false);
+                }
+            };
+
+            circlePad.addEventListener('pointerdown', (e) => {
                 e.preventDefault();
-                this.player.keys[keyProp] = true;
-            };
-            const endHold = () => {
-                this.player.keys[keyProp] = false;
-            };
-            btn.addEventListener('mousedown', startHold);
-            btn.addEventListener('mouseup', endHold);
-            btn.addEventListener('mouseleave', endHold);
-            btn.addEventListener('touchstart', startHold);
-            btn.addEventListener('touchend', endHold);
-        };
-        bindHoldBtn('btn-fight-up', 'forward');
-        bindHoldBtn('btn-fight-left', 'left');
-        bindHoldBtn('btn-fight-right', 'right');
-        bindHoldBtn('btn-fight-down', 'backward');
+                e.stopPropagation();
+                activePointerId = e.pointerId;
+                if (circlePad.setPointerCapture) {
+                    try { circlePad.setPointerCapture(e.pointerId); } catch (_) {}
+                }
+                updateCircleVector(e.clientX, e.clientY, true);
+            });
+            circlePad.addEventListener('pointermove', (e) => {
+                if (activePointerId === null || e.pointerId !== activePointerId) return;
+                e.preventDefault();
+                updateCircleVector(e.clientX, e.clientY, false);
+            });
+            circlePad.addEventListener('pointerup', releaseCirclePad);
+            circlePad.addEventListener('pointercancel', releaseCirclePad);
+            window.addEventListener('blur', () => releaseCirclePad());
+        }
 
         // Lắng nghe sự kiện thời tiết tự động hoặc thủ công thay đổi
         window.addEventListener('weather_changed', (e) => {
@@ -1617,7 +1755,51 @@ export class UIManager {
                     if (btn && !btn.disabled) btn.click();
                 }
             }
+            if (e.code === 'Enter') {
+                const mixModal = document.getElementById('modal-mix');
+                if (mixModal && mixModal.style.display === 'flex') {
+                    e.preventDefault();
+                    const doMixBtn = document.getElementById('btn-do-mix');
+                    if (doMixBtn) doMixBtn.click();
+                }
+            }
         });
+
+        // Chọn Loại Câu trong Chậu Pha Mồi (Câu Cám / Câu Ốc / Câu Ngô)
+        document.querySelectorAll('#mix-mode-tabs .mix-mode-tab').forEach(tab => {
+            tab.onclick = () => {
+                soundManager.playClick();
+                const mode = tab.getAttribute('data-mode') || 'CAM';
+                this.mixingSystem.setFishingMode(mode, true);
+                // Nếu chuyển sang Câu Ốc hoặc Câu Ngô và đang cân bài không phải tì đáy, gợi ý tự chuyển sang Cân 3 Câu 3 cho tiện
+                if ((mode === 'SNAIL' || mode === 'CORN') && this.rigConfig && !isValidSnailCornCalibration(this.rigConfig.calibrationId)) {
+                    this.rigConfig.calibrationId = 'can3_cau3';
+                    this.saveRigConfig();
+                    if (this.gameplay && this.gameplay.applyRigSetup) this.gameplay.applyRigSetup(this.rigConfig);
+                }
+                const slider = document.getElementById('slider-water');
+                if (slider) slider.value = this.mixingSystem.currentMix.waterRatio;
+                const wVal = document.getElementById('water-ratio-val');
+                if (wVal) wVal.innerText = Number(this.mixingSystem.currentMix.waterRatio).toFixed(2);
+                this.renderMixModes();
+                this.renderMixBaseBaits();
+                this.renderMixFlavors();
+                this.renderMixCalibrations();
+                this.updateMixAnalysis();
+            };
+        });
+
+        const btnClearBasin = document.getElementById('btn-clear-basin');
+        if (btnClearBasin) {
+            btnClearBasin.onclick = () => {
+                soundManager.playClick();
+                this.mixingSystem.clearBasin();
+                this.renderMixBaseBaits();
+                this.renderMixFlavors();
+                this.renderMixCalibrations();
+                this.updateMixAnalysis();
+            };
+        }
 
         // Thanh trượt nước
         const waterSlider = document.getElementById('slider-water');
@@ -1628,63 +1810,66 @@ export class UIManager {
             this.updateMixAnalysis();
         };
 
-        // Nút trộn mồi
+        // Nút Nhào Trộn & Pha Chế toàn bộ đồ trong chậu
         document.getElementById('btn-do-mix').onclick = () => {
             const itemsMap = {};
             this.shopItems.forEach(i => itemsMap[i.id] = i);
             const currentWeather = this.environment ? this.environment.weather : 'SUNNY';
-            const res = this.mixingSystem.mixBait(itemsMap, currentWeather);
+            const res = this.mixingSystem.mixBait(itemsMap, currentWeather, this.playerInventory);
             if (res.success) {
+                this.savePlayerProfile();
                 this.gameplay.activeHookBait = res.hookBait;
                 this.gameplay.activeGroundBait = res.groundBait;
                 if (this.gameplay.updateBaitTrayVisuals) this.gameplay.updateBaitTrayVisuals();
                 soundManager.playWaterSplash(1.0);
                 this.closeMixModal();
-                this.showPrompt(`✅ Đã pha [${res.hookBait.name}] • ${res.hookBait.firmnessLabel} • ${res.hookBait.rigStyleLabel} (10 viên câu + 6 nắm xả). ${res.analysis.waterRuleFeedback} 👉 Bấm F xả ổ trước rồi mới ra cần!`);
+                const warnOverdose = res.analysis.isFlavorOverdose
+                    ? ' ⚠️ CẢNH BÁO: Đang pha quá liều gây NẶNG MÙI — cá sẽ cày nhiều tăm và dễ đè phao!'
+                    : ` ✨ ${res.analysis.ratioBadge}`;
+                this.showPrompt(`✅ Đã pha chế [${res.hookBait.name}] (${res.hookBait.charges} viên câu + ${res.groundBait.charges} nắm xả).${warnOverdose} 👉 Bấm F xả ổ trước rồi mới ra cần!`);
             } else {
-                alert(res.message);
+                this.showScenarioToast('🥣 CHƯA THỂ PHA CHẾ', res.message, 'WARN');
             }
         };
 
-        // 4 BÀI MỒI MẪU CHUẨN CÂU ĐÀI (QUICK PRO RECIPES)
-        const setupPreset = (btnId, baseId, flavorDropsMap, waterRatio) => {
+        // 4 BÀI MỒI MẪU CHUẨN TỶ LỆ VÀNG (CÁM / ỐC / NGÔ)
+        const applyBasinPreset = (btnId, mode, basinMap, flavorMap, waterRatio) => {
             const btn = document.getElementById(btnId);
             if (!btn) return;
             btn.onclick = () => {
                 soundManager.playClick();
-                const baseItem = this.shopItems.find(i => i.id === baseId);
-                if (baseItem) this.mixingSystem.setBaseBait(baseItem);
-
-                // Reset flavors
-                const flavorItems = this.shopItems.filter(i => i.category === 'flavor');
-                flavorItems.forEach(f => this.mixingSystem.setFlavorDrops(f.id, 0));
-
-                // Apply selected flavors
-                Object.keys(flavorDropsMap).forEach(fId => {
-                    this.mixingSystem.setFlavorDrops(fId, flavorDropsMap[fId]);
-                });
-
-                // Water ratio
+                this.mixingSystem.setFishingMode(mode, false);
+                this.mixingSystem.currentMix.basinItems = { ...basinMap };
+                this.mixingSystem.currentMix.flavors = { ...flavorMap };
                 this.mixingSystem.setWaterRatio(waterRatio);
+
+                if ((mode === 'SNAIL' || mode === 'CORN') && this.rigConfig && !isValidSnailCornCalibration(this.rigConfig.calibrationId)) {
+                    this.rigConfig.calibrationId = 'can3_cau3';
+                    this.saveRigConfig();
+                    if (this.gameplay && this.gameplay.applyRigSetup) this.gameplay.applyRigSetup(this.rigConfig);
+                }
+
                 const slider = document.getElementById('slider-water');
                 if (slider) slider.value = waterRatio;
                 const waterVal = document.getElementById('water-ratio-val');
                 if (waterVal) waterVal.innerText = Number(waterRatio).toFixed(2);
 
+                this.renderMixModes();
                 this.renderMixBaseBaits();
                 this.renderMixFlavors();
+                this.renderMixCalibrations();
                 this.updateMixAnalysis();
             };
         };
 
-        // 1. Chép Sa Phạm Đậm Tanh (Nước 0.8)
-        setupPreset('preset-chep-sapham', 'bait_phuthanh_chep', { 'flavor_sapham_suango': 2, 'flavor_sapham_luchuong': 2 }, 0.8);
-        // 2. Trắm Đen Củ Gấu (Nước 0.7 - Mồi Xả Hạt)
-        setupPreset('preset-tram-cugau', 'bait_cugau_carp', { 'flavor_sapham_huongvai': 3, 'flavor_sapham_tinhdua': 1 }, 0.7);
-        // 3. Rô Phi Tơi Xốp (Nước 1.0)
-        setupPreset('preset-rophi-xop', 'bait_vuacau_rophi', { 'flavor_sapham_luchuong': 2, 'flavor_sapham_suango': 1 }, 1.0);
-        // 4. Săn Boss Kim Long (Nước 0.85)
-        setupPreset('preset-boss-kimlong', 'bait_kimlong_no1', { 'flavor_kimlong_suachep': 3, 'flavor_sapham_suango': 1 }, 0.85);
+        // 1. Câu Cám Quốc Dân: 1kg Cám Thơm Tanh + 4 giọt Mật Khoai + 3 giọt Sữa Ngô (7 giọt/1kg)
+        applyBasinPreset('preset-cam-quocdan', 'CAM', { cam_nen_thom_tanh: 1.0 }, { hl_mat_khoai: 4, hl_sua_ngo: 3 }, 0.8);
+        // 2. Câu Cám Đấu Giải: 1kg Cám Nền Thơm + 4 giọt Lục Hương + 3 giọt Tương Sữa Thơm (7 giọt/1kg)
+        applyBasinPreset('preset-cam-daugiai', 'CAM', { cam_nen_thom: 1.0 }, { hl_luc_huong: 4, hl_tuong_sua_thom: 3 }, 0.8);
+        // 3. Câu Ốc Săn Hàng Chuẩn Tỷ Lệ: 1kg Ốc Bươu + 1kg Cám Thơm Tanh + 8 giọt Rượu Thuốc Bắc (chuẩn 5–10 giọt/1kg cám!)
+        applyBasinPreset('preset-oc-thuocbac', 'SNAIL', { oc_buou: 1.0, cam_nen_thom_tanh: 1.0 }, { hl_ruou_thuoc_bac: 8 }, 0.7);
+        // 4. Câu Ngô Ngọt Chuẩn Tỷ Lệ: 10 bắp Ngô Ngọt + 8ml Nước Xanh (chuẩn 5–10ml/10 bắp!)
+        applyBasinPreset('preset-ngo-nuocxanh', 'CORN', { ngo_ngot: 10 }, { hl_nuoc_xanh: 8 }, 0.65);
 
         // QUY TRÌNH 4 BƯỚC CÂU ĐÀI (FISHING FLOW BUTTONS)
         const btnFlowTicket = document.getElementById('flow-step-ticket');
@@ -2209,6 +2394,7 @@ export class UIManager {
             body: JSON.stringify({
                 tab: 'bait',
                 type: 'BAIT_PACK',
+                baitItemId: key,
                 name: `${itemName} (Ký gửi Online)`,
                 seller: sellerName,
                 price: Math.round(sellPrice * 1.15),
@@ -2244,7 +2430,8 @@ export class UIManager {
                 body: JSON.stringify({ id: item.id })
             }).then(() => this.syncWorldMarketFromServer()).catch(() => {});
             this.worldListings.splice(idx, 1);
-            this.playerInventory.pt_chep_1 = (this.playerInventory.pt_chep_1 || 0) + 1;
+            const targetBaitId = item.baitItemId || 'cam_nen_thom_tanh';
+            this.playerInventory[targetBaitId] = Number(((this.playerInventory[targetBaitId] || 0) + 1).toFixed(2));
         } else if (item.rewardType === 'UPGRADE_LEVEL') {
             const cur = this.equipmentLevels[item.equipKey] || 1;
             if (item.targetLevel > cur) {
@@ -2534,6 +2721,10 @@ export class UIManager {
                     length: upgLvlToLen(upgRodLvl),
                     hardness: upgTier.tierTag,
                     maxFishWeight: upgTier.maxSafeWeight,
+                    rodColor: upgTier.rodColor,
+                    accentColor: upgTier.accentColor,
+                    secondaryAccent: upgTier.secondaryAccent,
+                    gripColor: upgTier.gripColor,
                     desc: upgTier.desc
                 });
             }
@@ -2544,6 +2735,7 @@ export class UIManager {
             const active = this.rigConfig.selectedRodId === r.id;
             return `
                 <button class="rig-rod-card ${active ? 'active' : ''}" data-rod-id="${r.id}">
+                    <div class="rig-rod-svg-wrap">${renderRodModelSVG(r, 178, 48)}</div>
                     <div class="rig-rod-name">${r.name}</div>
                     <div class="rig-rod-stats">📏 Dài ${r.length}m • 💪 Tải cá tối đa: <b>${r.maxFishWeight}kg</b></div>
                 </button>
@@ -2578,6 +2770,13 @@ export class UIManager {
             calibDescEl.innerText = `💡 ${curCalib.label}: ${curCalib.desc}`;
         }
 
+        const tankPreviewEl = document.getElementById('rig-water-tank-preview');
+        if (tankPreviewEl && curCalib) {
+            const fltLvl = (this.equipmentLevels && this.equipmentLevels.float) || 1;
+            const curFloatTier = getEquippedTier('float', fltLvl) || {};
+            tankPreviewEl.innerHTML = renderRigWaterTankSVG(curCalib, this.rigConfig, curFloatTier);
+        }
+
         // 3. Render Dropdown Trục & Thẻo (1.0 -> 10.0) + Thông số tải tĩnh/tải cá + Tồn kho
         const optsHtml = LINE_SIZES.map(ls =>
             `<option value="${ls.size}">Số ${ls.label} (Tải tĩnh ${ls.staticLoadKg}kg • Tải cá ${ls.maxFishKg}kg)</option>`
@@ -2591,6 +2790,11 @@ export class UIManager {
         const lSpec = getLineSpec(this.rigConfig.leaderSize);
         const mStock = (this.rigConfig.mainLineStock && this.rigConfig.mainLineStock[mSpec.size]) || 0;
         const lStock = (this.rigConfig.leaderStock && this.rigConfig.leaderStock[lSpec.size]) || 0;
+
+        const mainSvgEl = document.getElementById('spool-main-svg');
+        const leadSvgEl = document.getElementById('spool-leader-svg');
+        if (mainSvgEl) mainSvgEl.innerHTML = renderLineSpoolSVG({ label: mSpec.label, lineColor: 0xfacc15 }, false, 64, 64);
+        if (leadSvgEl) leadSvgEl.innerHTML = renderLineSpoolSVG({ label: lSpec.label, lineColor: 0x38bdf8 }, true, 64, 64);
 
         document.getElementById('spec-main-line').innerHTML = `Tải tĩnh: <b>${mSpec.staticLoadKg}kg</b> • Tải cá tối đa: <b>${mSpec.maxFishKg}kg</b>`;
         document.getElementById('spec-leader-line').innerHTML = `Tải tĩnh: <b>${lSpec.staticLoadKg}kg</b> • Tải cá tối đa: <b>${lSpec.maxFishKg}kg</b>`;
@@ -2629,7 +2833,7 @@ export class UIManager {
                     this.saveRigConfig();
                     this.updateMoneyUI();
                     soundManager.playUpgradeSuccess();
-                    this.renderRigSetupModal();
+                    this.renderRigModal();
                     this.showPrompt('🔧 Đã thay lóng cần mới — Độ bền phục hồi 100%!');
                 };
             }
@@ -2842,6 +3046,18 @@ export class UIManager {
                     <span class="upg-rank-tag rank-${visualRank}">${curTier.tierTag}</span>
                 </div>
                 <div class="upg-pips-row">${pipsHtml}</div>
+                <div class="upg-model-showcase">
+                    <div class="upg-model-cur">
+                        <span class="upg-model-tag">Đang dùng</span>
+                        ${renderEquipmentPreviewSVG(cat.key, curTier)}
+                    </div>
+                    ${nextTier ? `
+                    <div class="upg-model-arrow">➔</div>
+                    <div class="upg-model-next">
+                        <span class="upg-model-tag next">Lv.${nextTier.level}</span>
+                        ${renderEquipmentPreviewSVG(cat.key, nextTier)}
+                    </div>` : ''}
+                </div>
                 <div class="upg-current-box">
                     <div class="upg-cur-name">✅ Đang dùng: <b>${curTier.name}</b></div>
                     <div class="upg-cur-desc">${curTier.desc}</div>
@@ -2910,19 +3126,24 @@ export class UIManager {
         });
 
         filtered.forEach(item => {
-            const ownedCount = this.playerInventory[item.id] || 0;
+            const ownedCount = Number((this.playerInventory[item.id] || 0).toFixed(2));
+            const unitTxt = item.unitLabel ? ` ${item.unitLabel}` : (item.category === 'flavor' ? ' chai' : '');
+            const isCorn = item.id === 'ngo_ngot';
             const card = document.createElement('div');
             card.className = 'shop-card';
             card.innerHTML = `
-                <div class="card-icon">${item.icon || '📦'}</div>
+                <div class="card-icon shop-svg-icon">${renderShopItemSVG(item)}</div>
                 <div class="card-info">
                     <div class="card-title">${item.name}</div>
-                    <div class="card-brand">${item.brand} - ${item.volume || item.hardness || ''}</div>
+                    <div class="card-brand">${item.brand} ${item.volume || item.hardness ? '• ' + (item.volume || item.hardness) : ''}</div>
                     <div class="card-desc">${item.description}</div>
                     <div class="card-bottom">
-                        <span class="card-price">${item.price.toLocaleString()} đ</span>
-                        <span class="card-owned">Đã có: <b>${ownedCount}</b></span>
-                        <button class="btn-buy" id="buy-${item.id}">Mua Ngay</button>
+                        <span class="card-price">${item.price.toLocaleString()} đ${item.packSizeLabel ? ' / ' + item.packSizeLabel : ''}</span>
+                        <span class="card-owned">Kho: <b>${ownedCount}${unitTxt}</b></span>
+                        <div style="display:flex;gap:5px;flex-wrap:wrap;">
+                            <button class="btn-buy" id="buy-${item.id}">Mua +1</button>
+                            ${isCorn ? `<button class="btn-buy" id="buy10-${item.id}" style="background:linear-gradient(135deg,#d97706,#b45309);">+10 bắp (100k)</button>` : ''}
+                        </div>
                     </div>
                 </div>
             `;
@@ -2931,14 +3152,31 @@ export class UIManager {
             card.querySelector(`#buy-${item.id}`).onclick = () => {
                 if (this.playerMoney >= item.price) {
                     this.playerMoney -= item.price;
-                    this.playerInventory[item.id] = (this.playerInventory[item.id] || 0) + 1;
+                    this.playerInventory[item.id] = Number(((this.playerInventory[item.id] || 0) + 1).toFixed(2));
                     this.updateMoneyUI();
                     soundManager.playClick();
                     this.renderShopItems(filter);
                 } else {
-                    alert('Không đủ tiền trong tài khoản để mua sản phẩm này!');
+                    this.showScenarioToast('💰 THIẾU TIỀN', `Cần ${item.price.toLocaleString()}đ để mua [${item.name}]!`, 'WARN');
                 }
             };
+
+            const buy10Btn = card.querySelector(`#buy10-${item.id}`);
+            if (buy10Btn) {
+                buy10Btn.onclick = () => {
+                    const p10 = item.price * 10;
+                    if (this.playerMoney >= p10) {
+                        this.playerMoney -= p10;
+                        this.playerInventory[item.id] = Number(((this.playerInventory[item.id] || 0) + 10).toFixed(2));
+                        this.updateMoneyUI();
+                        soundManager.playClick();
+                        this.renderShopItems(filter);
+                        this.showPrompt('🌽 Đã mua +10 bắp Ngô Ngọt (100.000đ) — sẵn sàng pha 5ml–10ml Nước Xanh!');
+                    } else {
+                        this.showScenarioToast('💰 THIẾU TIỀN', `Cần ${p10.toLocaleString()}đ để mua 10 bắp Ngô Ngọt!`, 'WARN');
+                    }
+                };
+            }
         });
     }
 
@@ -2946,6 +3184,11 @@ export class UIManager {
         document.exitPointerLock();
         soundManager.playClick();
         document.getElementById('modal-mix').style.display = 'flex';
+        const slider = document.getElementById('slider-water');
+        if (slider) slider.value = this.mixingSystem.currentMix.waterRatio || 0.8;
+        const wVal = document.getElementById('water-ratio-val');
+        if (wVal) wVal.innerText = Number(this.mixingSystem.currentMix.waterRatio || 0.8).toFixed(2);
+        this.renderMixModes();
         this.renderMixBaseBaits();
         this.renderMixFlavors();
         this.renderMixCalibrations();
@@ -2953,13 +3196,25 @@ export class UIManager {
         this.bindPrepOptions();
     }
 
-    // Hiển thị đủ 15 bài Cân Phao ngay trong Thau Trộn Mồi (đồng bộ 2 chiều với bộ Trục/Phao!)
+    renderMixModes() {
+        const curMode = this.mixingSystem.currentMix.fishingMode || 'CAM';
+        document.querySelectorAll('#mix-mode-tabs .mix-mode-tab').forEach(tab => {
+            tab.classList.toggle('active', tab.getAttribute('data-mode') === curMode);
+        });
+        const hintEl = document.getElementById('basin-mode-hint');
+        if (hintEl) {
+            const m = FISHING_MODES[curMode] || FISHING_MODES.CAM;
+            hintEl.innerHTML = `${m.icon} <b>Chế độ ${m.label}:</b> ${m.ruleHint}`;
+        }
+    }
+
+    // Hiển thị đủ 15 bài Cân Phao ngay trong Chậu Pha Mồi (đồng bộ 2 chiều với bộ Trục/Phao!)
     renderMixCalibrations() {
         const grid = document.getElementById('mix-calib-grid');
         if (!grid) return;
-        const base = this.mixingSystem.currentMix.baseBait;
-        const baseName = base ? (base.name || '').toLowerCase() : '';
-        const isSnailOrCorn = baseName.includes('ốc') || baseName.includes('ngô');
+        const mix = this.mixingSystem.currentMix;
+        const basin = mix.basinItems || {};
+        const isSnailOrCorn = mix.fishingMode === 'SNAIL' || mix.fishingMode === 'CORN' || (basin.oc_van || 0) > 0 || (basin.oc_buou || 0) > 0 || (basin.ngo_ngot || 0) > 0;
         const curCalId = (this.rigConfig && this.rigConfig.calibrationId) ? this.rigConfig.calibrationId : 'can7_cau3';
         const curStyleId = (this.rigConfig && this.rigConfig.fishingStyle) ? this.rigConfig.fishingStyle : 'CAN_DAI';
 
@@ -3028,16 +3283,13 @@ export class UIManager {
                             <rect x="0" y="22" width="340" height="62" fill="#0f4c45"/>
                             <rect x="0" y="84" width="340" height="18" fill="#7c5a36"/>
                             <line x1="0" y1="22" x2="340" y2="22" stroke="#bae6fd" stroke-width="1"/>
-                            <!-- Phao chân dài đứng 2,2/3 nấc -->
                             <line x1="56" y1="10" x2="56" y2="56" stroke="#e2e8f0" stroke-width="1.6"/>
                             <rect x="53.5" y="10" width="5" height="4" fill="#ef4444"/>
                             <rect x="53.5" y="14" width="5" height="4" fill="#facc15"/>
                             <rect x="53.5" y="18" width="5" height="4" fill="#22c55e"/>
                             <ellipse cx="56" cy="31" rx="4.5" ry="9" fill="#c2410c" stroke="#fed7aa" stroke-width="0.9"/>
-                            <!-- Dây trục xiên từ chân phao tới 2 viên mồi đáy -->
                             <path d="M 56 56 Q ${(56 + baitSvgX) / 2} 76 ${baitSvgX} 83" fill="none" stroke="#e2e8f0" stroke-width="1.6"/>
                             ${leadMode === 'SLIDING_LEAD' ? `<ellipse cx="${Math.round(56 + (baitSvgX - 56) * 0.72)}" cy="79" rx="4" ry="2.2" fill="#94a3b8" stroke="#f8fafc" stroke-width="0.7"/>` : ''}
-                            <!-- 2 viên mồi nằm đáy -->
                             <circle cx="${baitSvgX}" cy="82" r="3.6" fill="#eab308" stroke="#713f12" stroke-width="0.8"/>
                             <circle cx="${baitSvgX + 7}" cy="82" r="3.6" fill="#eab308" stroke="#713f12" stroke-width="0.8"/>
                             <text x="68" y="15" fill="#0f172a" font-size="9.5" font-weight="700">phao đứng 2,2/3 nấc</text>
@@ -3085,7 +3337,7 @@ export class UIManager {
             }
         }
 
-        // 3B. Lưới 15 bài Cân Phao chuẩn đài (tách biệt hoàn toàn khỏi Bán Đấu / Hố Đấu!)
+        // 3B. Lưới 15 bài Cân Phao chuẩn đài
         grid.innerHTML = FLOAT_CALIBRATIONS.map(c => {
             const active = c.id === curCalId;
             const validSC = isValidSnailCornCalibration(c.id);
@@ -3110,6 +3362,7 @@ export class UIManager {
                     this.mixingSystem.setRigStyle(mappedRig);
                 }
                 this.renderMixCalibrations();
+                this.updateMixAnalysis();
             };
         });
 
@@ -3133,13 +3386,9 @@ export class UIManager {
                 statusEl.innerHTML = `<span style="color:#7dd3fc;font-weight:700;">${curStyle.label} + ${curCal.label}:</span> ${curStyle.desc}<br/><span style="color:#fde047;">💡 ${phaseTip}</span>`;
             }
         }
-        const footSum = document.getElementById('mix-footer-summary');
-        if (footSum && curCal) {
-            footSum.innerHTML = `Mồi: <b>${base ? base.name : 'Chưa chọn'}</b> • <b style="color:${curStyle.color}">${curStyle.shortLabel}</b> • <b style="color:#fde047">${curCal.shortTag}</b>`;
-        }
     }
 
-    // Nút chọn Độ vê mồi & Kiểu cân phao trong thau pha mồi
+    // Nút chọn Độ vê mồi & Kiểu cân phao trong chậu pha mồi
     bindPrepOptions() {
         const mix = this.mixingSystem.currentMix;
         document.querySelectorAll('.btn-prep-opt[data-firm]').forEach(btn => {
@@ -3164,86 +3413,189 @@ export class UIManager {
         document.getElementById('modal-mix').style.display = 'none';
     }
 
+    // BƯỚC 2A: KỆ NGUYÊN LIỆU NỀN ĐỂ BỎ VÀO CHẬU (Cám 35k/kg • Ngô Ngọt 10k/bắp • Ốc Vặn/Ốc Bươu 20k/kg)
     renderMixBaseBaits() {
         const container = document.getElementById('base-bait-list');
+        if (!container) return;
         container.innerHTML = '';
 
-        const baseItems = this.shopItems.filter(i => i.category === 'base_bait');
+        const mode = this.mixingSystem.currentMix.fishingMode || 'CAM';
+        const baseItems = [...this.shopItems.filter(i => i.category === 'base_bait')];
+
+        // Ưu tiên đưa nhóm nguyên liệu chính của Loại Câu đang chọn lên đầu kệ
+        const rankItem = (it) => {
+            if (mode === 'SNAIL') return it.subType === 'SNAIL' ? 0 : (it.subType === 'CAM' ? 1 : 2);
+            if (mode === 'CORN') return it.subType === 'CORN' ? 0 : (it.subType === 'CAM' ? 1 : 2);
+            return it.subType === 'CAM' ? 0 : 1;
+        };
+        baseItems.sort((a, b) => rankItem(a) - rankItem(b));
+
         baseItems.forEach(item => {
-            const count = this.playerInventory[item.id] || 0;
+            const stock = Number((this.playerInventory[item.id] || 0).toFixed(2));
+            const inBasin = this.mixingSystem.getBasinItemAmount(item.id);
+            const isCorn = item.subType === 'CORN';
+            const step = isCorn ? 1 : 0.5;
+            const fastStep = isCorn ? 5 : 1;
+            const unit = item.unitLabel || 'kg';
+            const buyQty = isCorn ? 10 : 2;
+            const buyCost = item.price * buyQty;
+
+            const isPrimaryForMode =
+                (mode === 'CAM' && item.subType === 'CAM') ||
+                (mode === 'SNAIL' && (item.subType === 'SNAIL' || item.subType === 'CAM')) ||
+                (mode === 'CORN' && item.subType === 'CORN');
+
             const row = document.createElement('div');
-            const isSelected = (this.mixingSystem.currentMix.baseBait && this.mixingSystem.currentMix.baseBait.id === item.id);
-            row.className = `btn-base-option ${isSelected ? 'selected' : ''}`;
-            const packPrice = (item.price || 35000) * 3;
+            row.className = `basin-ing-row ${inBasin > 0 ? 'in-basin' : ''} ${isPrimaryForMode ? 'mode-match' : 'mode-dim'}`;
             row.innerHTML = `
-                <span class="base-opt-name">${item.icon} ${item.name} <b style="color:${count > 0 ? '#7dd3fc' : '#f87171'}">(Có: ${count})</b></span>
-                ${count <= 0 ? `<button class="btn-quick-buy-base" title="Mua nhanh 3 gói ngay tại thau">🛒 +3 (${Math.round(packPrice / 1000)}k)</button>` : ''}
+                <div class="ing-row-left">
+                    <span class="ing-ico">${item.icon}</span>
+                    <div class="ing-meta">
+                        <div class="ing-title">
+                            <b>${item.name}</b>
+                            <span class="ing-price-tag">${item.volume || ''}</span>
+                        </div>
+                        <div class="ing-stock">
+                            Kho: <b style="color:${stock >= inBasin && stock > 0 ? '#7dd3fc' : '#f87171'}">${stock} ${unit}</b>
+                            ${inBasin > stock ? `<span style="color:#fbbf24;font-weight:700;"> (Thiếu ${Number((inBasin - stock).toFixed(2))} ${unit})</span>` : ''}
+                        </div>
+                    </div>
+                </div>
+                <div class="ing-row-controls">
+                    <button class="btn-ing-step btn-minus" ${inBasin <= 0 ? 'disabled' : ''} title="Bớt khỏi chậu">−</button>
+                    <span class="ing-basin-val">${inBasin > 0 ? `<b>${inBasin}</b> ${unit}` : '0'}</span>
+                    <button class="btn-ing-step btn-plus" title="Bỏ thêm ${step}${unit} vào chậu">+${step}${isCorn ? '' : 'kg'}</button>
+                    <button class="btn-ing-step btn-plus-fast" title="Bỏ nhanh +${fastStep} ${unit} vào chậu">+${fastStep}${isCorn ? '🌽' : 'kg'}</button>
+                    <button class="btn-quick-buy-base" title="Mua thêm ${buyQty} ${unit} ${item.name} (${buyCost.toLocaleString()}đ)">🛒+${buyQty}${isCorn ? '' : 'kg'} (${Math.round(buyCost / 1000)}k)</button>
+                </div>
             `;
-            row.onclick = (e) => {
-                if (e.target && e.target.classList.contains('btn-quick-buy-base')) return;
-                this.mixingSystem.setBaseBait(item);
+
+            row.querySelector('.btn-minus').onclick = () => {
+                soundManager.playClick();
+                this.mixingSystem.setBasinItemAmount(item.id, Math.max(0, inBasin - step), step);
                 this.renderMixBaseBaits();
                 this.renderMixCalibrations();
                 this.updateMixAnalysis();
             };
-            const buyBtn = row.querySelector('.btn-quick-buy-base');
-            if (buyBtn) {
-                buyBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    if (this.playerMoney < packPrice) {
-                        this.showPrompt(`💰 Cần ${packPrice.toLocaleString()}đ để mua nhanh 3 gói ${item.name}!`);
-                        return;
-                    }
-                    this.playerMoney -= packPrice;
-                    this.playerInventory[item.id] = (this.playerInventory[item.id] || 0) + 3;
-                    this.updateMoneyUI();
-                    soundManager.playClick();
-                    this.mixingSystem.setBaseBait(item);
-                    this.renderMixBaseBaits();
-                    this.renderMixCalibrations();
-                    this.updateMixAnalysis();
-                    this.showPrompt(`🛒 Đã mua nhanh +3 gói [${item.name}]!`);
-                };
-            }
+            row.querySelector('.btn-plus').onclick = () => {
+                soundManager.playClick();
+                this.mixingSystem.setBasinItemAmount(item.id, inBasin + step, step);
+                this.renderMixBaseBaits();
+                this.renderMixCalibrations();
+                this.updateMixAnalysis();
+            };
+            row.querySelector('.btn-plus-fast').onclick = () => {
+                soundManager.playClick();
+                this.mixingSystem.setBasinItemAmount(item.id, inBasin + fastStep, step);
+                this.renderMixBaseBaits();
+                this.renderMixCalibrations();
+                this.updateMixAnalysis();
+            };
+            row.querySelector('.btn-quick-buy-base').onclick = () => {
+                if (this.playerMoney < buyCost) {
+                    this.showScenarioToast('💰 THIẾU TIỀN', `Cần ${buyCost.toLocaleString()}đ để mua +${buyQty} ${unit} [${item.name}]!`, 'WARN');
+                    return;
+                }
+                this.playerMoney -= buyCost;
+                this.playerInventory[item.id] = Number(((this.playerInventory[item.id] || 0) + buyQty).toFixed(2));
+                this.updateMoneyUI();
+                soundManager.playClick();
+                if (inBasin <= 0) {
+                    this.mixingSystem.setBasinItemAmount(item.id, isCorn ? 10 : 1.0, step);
+                }
+                this.renderMixBaseBaits();
+                this.renderMixCalibrations();
+                this.updateMixAnalysis();
+                this.showPrompt(`🛒 Đã mua nhanh +${buyQty} ${unit} [${item.name}] (${buyCost.toLocaleString()}đ)!`);
+            };
+
             container.appendChild(row);
         });
-
-        if (!this.mixingSystem.currentMix.baseBait && baseItems.length > 0) {
-            this.mixingSystem.setBaseBait(baseItems[0]);
-        }
     }
 
+    // BƯỚC 2B: KỆ HƯƠNG LIỆU NHỎ VÀO CHẬU (Giọt cho Cám & Rượu Thuốc Bắc • ml cho Nước Xanh)
     renderMixFlavors() {
         const container = document.getElementById('flavor-select-list');
+        if (!container) return;
         container.innerHTML = '';
 
-        const flavorItems = this.shopItems.filter(i => i.category === 'flavor');
+        const mode = this.mixingSystem.currentMix.fishingMode || 'CAM';
+        const flavorItems = [...this.shopItems.filter(i => i.category === 'flavor')];
+        flavorItems.sort((a, b) => {
+            const aMatch = a.bestFor === mode ? 0 : 1;
+            const bMatch = b.bestFor === mode ? 0 : 1;
+            return aMatch - bMatch;
+        });
+
         flavorItems.forEach(item => {
             const owned = this.playerInventory[item.id] || 0;
-            const currentDrops = this.mixingSystem.currentMix.flavors[item.id] || 0;
+            const currentAmt = this.mixingSystem.currentMix.flavors[item.id] || 0;
+            const unit = item.doseUnit || 'giọt';
+            const isMatch = item.bestFor === mode;
 
             const row = document.createElement('div');
-            row.className = 'flavor-row';
+            row.className = `flavor-row ${currentAmt > 0 ? 'in-basin' : ''} ${isMatch ? 'flavor-recommended' : ''}`;
             row.innerHTML = `
-                <div class="flavor-name">${item.icon} <b>${item.name}</b> <small>(${item.brand})</small></div>
+                <div class="flavor-name">
+                    <div>${item.icon} <b>${item.name}</b> ${isMatch ? '<span class="flv-rec-badge">⭐ Khuyên dùng</span>' : ''}</div>
+                    <small class="flv-best-note">${item.bestForLabel || item.brand}</small>
+                </div>
                 <div class="flavor-drops-control">
-                    <button class="btn-drop minus" ${currentDrops <= 0 ? 'disabled' : ''}>-</button>
-                    <span class="drop-num">${currentDrops} nắp/giọt</span>
-                    <button class="btn-drop plus" ${owned <= 0 ? 'disabled' : ''}>+</button>
+                    ${owned > 0 ? `
+                        <button class="btn-drop minus" ${currentAmt <= 0 ? 'disabled' : ''}>−</button>
+                        <span class="drop-num"><b>${currentAmt}</b> ${unit}</span>
+                        <button class="btn-drop plus">+1</button>
+                        <button class="btn-drop plus5" title="Thêm nhanh 5 ${unit}">+5</button>
+                    ` : `
+                        <button class="btn-quick-buy-base btn-buy-flavor">🛒 Mua Chai (${Math.round(item.price / 1000)}k)</button>
+                    `}
                 </div>
             `;
 
-            row.querySelector('.minus').onclick = () => {
-                this.mixingSystem.setFlavorDrops(item.id, currentDrops - 1);
-                this.renderMixFlavors();
-                this.updateMixAnalysis();
-            };
-
-            row.querySelector('.plus').onclick = () => {
-                this.mixingSystem.setFlavorDrops(item.id, currentDrops + 1);
-                this.renderMixFlavors();
-                this.updateMixAnalysis();
-            };
+            const minusBtn = row.querySelector('.minus');
+            if (minusBtn) {
+                minusBtn.onclick = () => {
+                    soundManager.playClick();
+                    this.mixingSystem.setFlavorDrops(item.id, Math.max(0, currentAmt - 1));
+                    this.renderMixFlavors();
+                    this.updateMixAnalysis();
+                };
+            }
+            const plusBtn = row.querySelector('.plus');
+            if (plusBtn) {
+                plusBtn.onclick = () => {
+                    soundManager.playClick();
+                    this.mixingSystem.setFlavorDrops(item.id, currentAmt + 1);
+                    this.renderMixFlavors();
+                    this.updateMixAnalysis();
+                };
+            }
+            const plus5Btn = row.querySelector('.plus5');
+            if (plus5Btn) {
+                plus5Btn.onclick = () => {
+                    soundManager.playClick();
+                    this.mixingSystem.setFlavorDrops(item.id, currentAmt + 5);
+                    this.renderMixFlavors();
+                    this.updateMixAnalysis();
+                };
+            }
+            const buyFlvBtn = row.querySelector('.btn-buy-flavor');
+            if (buyFlvBtn) {
+                buyFlvBtn.onclick = () => {
+                    if (this.playerMoney < item.price) {
+                        this.showScenarioToast('💰 THIẾU TIỀN', `Cần ${item.price.toLocaleString()}đ để mua chai [${item.name}]!`, 'WARN');
+                        return;
+                    }
+                    this.playerMoney -= item.price;
+                    this.playerInventory[item.id] = (this.playerInventory[item.id] || 0) + 1;
+                    this.updateMoneyUI();
+                    soundManager.playClick();
+                    this.mixingSystem.setFlavorDrops(item.id, item.suggestedDrops || 5);
+                    this.renderMixFlavors();
+                    this.updateMixAnalysis();
+                    this.showPrompt(`🛒 Đã mua chai [${item.name}] và nhỏ sẵn ${item.suggestedDrops || 5} ${unit} vào chậu!`);
+                };
+            }
 
             container.appendChild(row);
         });
@@ -3255,90 +3607,118 @@ export class UIManager {
         const currentWeather = this.environment ? this.environment.weather : 'SUNNY';
         const res = this.mixingSystem.analyzeRecipe(itemsMap, currentWeather);
 
-        if (res.valid) {
+        // Vẽ trực tiếp Chậu Trộn Mồi 3D SVG + Danh sách Chip các đồ đang nằm trong chậu
+        const svgWrap = document.getElementById('mix-basin-svg-wrap');
+        if (svgWrap) {
+            svgWrap.innerHTML = renderMixingBasinSVG(this.mixingSystem.currentMix, res);
+        }
+
+        const chipsWrap = document.getElementById('mix-basin-chips');
+        if (chipsWrap) {
+            const chips = [];
+            (res.basinEntries || []).forEach(({ item, id, qty }) => {
+                chips.push(`<span class="basin-chip chip-base" data-rm-base="${id}" title="Bấm để bỏ món này ra khỏi chậu">${item.icon} ${qty}${item.unitLabel || 'kg'} ${item.name} <b>&times;</b></span>`);
+            });
+            (res.flavorEntries || []).forEach(({ item, id, amt }) => {
+                chips.push(`<span class="basin-chip chip-flavor ${res.isFlavorOverdose ? 'chip-overdose' : ''}" data-rm-flv="${id}" title="Bấm để bỏ hương liệu này ra khỏi chậu">${item.icon} ${amt}${item.doseUnit || ' giọt'} ${item.name} <b>&times;</b></span>`);
+            });
+            chipsWrap.innerHTML = chips.length > 0
+                ? chips.join('')
+                : '<span class="basin-empty-note">Chưa có nguyên liệu nào trong chậu — Hãy bấm [+0.5kg / +1kg / +5🌽] ở kệ bên dưới!</span>';
+
+            chipsWrap.querySelectorAll('[data-rm-base]').forEach(el => {
+                el.onclick = () => {
+                    soundManager.playClick();
+                    this.mixingSystem.setBasinItemAmount(el.getAttribute('data-rm-base'), 0, 0.5);
+                    this.renderMixBaseBaits();
+                    this.renderMixCalibrations();
+                    this.updateMixAnalysis();
+                };
+            });
+            chipsWrap.querySelectorAll('[data-rm-flv]').forEach(el => {
+                el.onclick = () => {
+                    soundManager.playClick();
+                    this.mixingSystem.setFlavorDrops(el.getAttribute('data-rm-flv'), 0);
+                    this.renderMixFlavors();
+                    this.updateMixAnalysis();
+                };
+            });
+        }
+
+        const curCal = getCalibrationById((this.rigConfig && this.rigConfig.calibrationId) || 'can7_cau3');
+        const curStyle = getFishingStyleById((this.rigConfig && this.rigConfig.fishingStyle) || 'CAN_DAI');
+        const footSum = document.getElementById('mix-footer-summary');
+
+        if (!res.valid) {
             const waterStatusEl = document.getElementById('ana-water-status');
             if (waterStatusEl) {
-                waterStatusEl.innerText = res.waterStatusTag;
-                waterStatusEl.className = `water-rule-banner ${currentWeather === 'RAINY' ? 'muddy' : 'clear'}`;
+                waterStatusEl.innerText = '⚠️ CHẬU CHƯA ĐỦ NGUYÊN LIỆU CHÍNH';
+                waterStatusEl.className = 'water-rule-banner muddy';
             }
-
-            const flavorDropsEl = document.getElementById('ana-flavor-drops');
-            if (flavorDropsEl) {
-                const levelText = res.totalFlavorDrops >= 6 ? 'Đậm Đặc' : res.totalFlavorDrops <= 3 ? 'Nhạt Dịu' : 'Vừa Phải';
-                flavorDropsEl.innerText = `${res.totalFlavorDrops} nắp/giọt (${levelText})`;
-            }
-
-            document.getElementById('ana-carp-score').innerText = `${res.totalScore} / 100 ⭐`;
-            document.getElementById('ana-big-score').innerText = `${res.bigCarpScore}% (Chép Củ)`;
-            document.getElementById('ana-radius').innerText = `${res.scentRadius} mét`;
-            document.getElementById('water-texture-desc').innerText = res.textureStatus;
-
             const ruleFeedbackEl = document.getElementById('ana-water-rule-feedback');
             if (ruleFeedbackEl) {
-                ruleFeedbackEl.innerText = res.waterRuleFeedback || '';
-                ruleFeedbackEl.className = `water-rule-feedback ${res.waterMultiplier > 1.1 ? 'rule-good' : res.waterMultiplier < 0.9 ? 'rule-bad' : 'rule-neutral'}`;
+                ruleFeedbackEl.innerText = res.message;
+                ruleFeedbackEl.className = 'water-rule-feedback rule-bad';
             }
-
-            const comboDiv = document.getElementById('ana-combos');
-            comboDiv.innerHTML = '';
-            if (res.detectedCombos.length > 0) {
-                res.detectedCombos.forEach(c => {
-                    const tag = document.createElement('div');
-                    tag.className = 'combo-tag';
-                    tag.innerText = c;
-                    comboDiv.appendChild(tag);
-                });
-            } else {
-                comboDiv.innerHTML = '<span class="text-muted">Chưa kích hoạt combo. Thử kết hợp Kim Long / Sa Phạm / GUF / Vua Câu</span>';
+            if (footSum) {
+                footSum.innerHTML = `<span style="color:#fca5a5;">⚠️ ${res.message}</span>`;
             }
+            return;
+        }
 
-            // Cập nhật Thau Mồi Mô Phỏng Trực Quan & Phân Vùng Nước
-            const wRatio = this.mixingSystem.currentMix.waterRatio || 0.8;
-            const basinPaste = document.getElementById('mix-basin-paste');
-            const basinTag = document.getElementById('mix-basin-tag');
-            const zoneBadge = document.getElementById('water-zone-badge');
+        const waterStatusEl = document.getElementById('ana-water-status');
+        if (waterStatusEl) {
+            waterStatusEl.innerText = res.waterStatusTag;
+            waterStatusEl.className = `water-rule-banner ${res.isFlavorOverdose ? 'overdose-alert' : (res.ratioVerdict === 'OPTIMAL' ? 'optimal-alert' : 'clear')}`;
+        }
 
-            let pasteBg = 'linear-gradient(135deg, #a16207, #713f12)';
-            const baseItem = this.mixingSystem.currentMix.baseBait;
-            if (baseItem) {
-                if (baseItem.id.includes('rophi')) pasteBg = 'linear-gradient(135deg, #be123c, #881337)';
-                else if (baseItem.id.includes('cugau')) pasteBg = 'linear-gradient(135deg, #573a08, #2e1065)';
-                else if (baseItem.id.includes('kimlong')) pasteBg = 'linear-gradient(135deg, #d97706, #92400e)';
-            }
+        const flavorDropsEl = document.getElementById('ana-flavor-drops');
+        if (flavorDropsEl) {
+            flavorDropsEl.innerText = res.flavorSummary;
+        }
 
-            if (basinPaste) {
-                basinPaste.style.background = pasteBg;
-                basinPaste.style.opacity = `${Math.min(1.0, 0.75 + wRatio * 0.25)}`;
-            }
+        document.getElementById('ana-carp-score').innerText = `${res.totalScore} / 100 ⭐`;
+        document.getElementById('ana-big-score').innerText = `${res.bigCarpScore}% (Săn Hàng)`;
+        document.getElementById('ana-radius').innerText = `${res.scentRadius} mét`;
+        document.getElementById('water-texture-desc').innerText = res.textureStatus;
 
+        const ruleFeedbackEl = document.getElementById('ana-water-rule-feedback');
+        if (ruleFeedbackEl) {
+            ruleFeedbackEl.innerText = res.waterRuleFeedback || '';
+            ruleFeedbackEl.className = `water-rule-feedback ${res.isFlavorOverdose ? 'rule-bad' : (res.ratioVerdict === 'OPTIMAL' ? 'rule-good' : 'rule-neutral')}`;
+        }
+
+        const comboDiv = document.getElementById('ana-combos');
+        comboDiv.innerHTML = '';
+        if (res.detectedCombos.length > 0) {
+            res.detectedCombos.forEach(c => {
+                const tag = document.createElement('div');
+                tag.className = 'combo-tag';
+                tag.innerText = c;
+                comboDiv.appendChild(tag);
+            });
+        } else {
+            comboDiv.innerHTML = '<span class="text-muted">Mẹo: Ốc pha 5–10 giọt Rượu Thuốc Bắc/1kg cám • Ngô 10 bắp pha 5–10ml Nước Xanh • Cám phối Mật Khoai + Sữa Ngô / Lục Hương!</span>';
+        }
+
+        const wRatio = this.mixingSystem.currentMix.waterRatio || 0.8;
+        const zoneBadge = document.getElementById('water-zone-badge');
+        if (zoneBadge) {
             if (wRatio < 0.75) {
-                if (basinTag) {
-                    basinTag.innerText = '🌾 MỒI XẢ HẠT • TƠI BUNG TẦNG ĐÁY (30S)';
-                    basinTag.className = 'basin-state-tag tag-loose';
-                }
-                if (zoneBadge) {
-                    zoneBadge.innerText = 'Xả Hạt Tơi';
-                    zoneBadge.className = 'water-zone-badge zone-loose';
-                }
+                zoneBadge.innerText = 'Ủ Tơi / Xả Hạt';
+                zoneBadge.className = 'water-zone-badge zone-loose';
             } else if (wRatio <= 0.88) {
-                if (basinTag) {
-                    basinTag.innerText = '🎯 MỒI CÂU CHUẨN • DẺO BÁM VUỐT LƯỠI';
-                    basinTag.className = 'basin-state-tag tag-standard';
-                }
-                if (zoneBadge) {
-                    zoneBadge.innerText = 'Chuẩn Vê Lưỡi';
-                    zoneBadge.className = 'water-zone-badge zone-standard';
-                }
+                zoneBadge.innerText = 'Chuẩn Vê Lưỡi';
+                zoneBadge.className = 'water-zone-badge zone-standard';
             } else {
-                if (basinTag) {
-                    basinTag.innerText = '🥣 MỒI CHÁO MỀM • VUỐT TƠ ĐÁNH CÁ NHÁT';
-                    basinTag.className = 'basin-state-tag tag-soft';
-                }
-                if (zoneBadge) {
-                    zoneBadge.innerText = 'Mềm Vuốt Tơ';
-                    zoneBadge.className = 'water-zone-badge zone-soft';
-                }
+                zoneBadge.innerText = 'Mềm Vuốt Tơ';
+                zoneBadge.className = 'water-zone-badge zone-soft';
             }
+        }
+
+        if (footSum && curCal && curStyle) {
+            const modeMeta = FISHING_MODES[res.fishingMode] || FISHING_MODES.CAM;
+            footSum.innerHTML = `${modeMeta.icon} <b>${res.ingredientSummary}</b> (${res.flavorSummary}) • <b style="color:${curStyle.color}">${curStyle.shortLabel}</b> • <b style="color:#fde047">${curCal.shortTag}</b>`;
         }
     }
 
@@ -3769,6 +4149,43 @@ export class UIManager {
     }
 
     // ==================== LƯU HỒ SƠ TỰ ĐỘNG & SỔ KỶ LỤC CẦN THỦ ====================
+    getDefaultBaitInventory() {
+        return {
+            cam_nen_thom: 2,
+            cam_nen_tanh: 1,
+            cam_nen_thom_tanh: 2,
+            ngo_ngot: 10,
+            oc_van: 2,
+            oc_buou: 2,
+            hl_mat_khoai: 1,
+            hl_tuong_sua_thom: 1,
+            hl_luc_huong: 1,
+            hl_sua_ngo: 1,
+            hl_ruou_thuoc_bac: 1,
+            hl_nuoc_xanh: 1
+        };
+    }
+
+    ensureStarterBaitInventory(savedInv) {
+        const def = this.getDefaultBaitInventory();
+        if (!savedInv || typeof savedInv !== 'object') return def;
+        const merged = { ...savedInv };
+        // Nếu hồ sơ cũ chưa từng được cấp bộ 12 mồi & hương liệu mới -> cấp bổ sung gói khởi đầu
+        const hasAnyNewBase =
+            typeof merged.cam_nen_thom === 'number' ||
+            typeof merged.cam_nen_tanh === 'number' ||
+            typeof merged.cam_nen_thom_tanh === 'number' ||
+            typeof merged.ngo_ngot === 'number' ||
+            typeof merged.oc_van === 'number' ||
+            typeof merged.oc_buou === 'number';
+        if (!hasAnyNewBase) {
+            Object.entries(def).forEach(([k, v]) => {
+                merged[k] = v;
+            });
+        }
+        return merged;
+    }
+
     loadPlayerProfile() {
         try {
             const raw = localStorage.getItem('vn_carp_profile_v1');
@@ -3778,7 +4195,7 @@ export class UIManager {
                 this.playerMoney = data.playerMoney;
             }
             if (data.playerInventory && typeof data.playerInventory === 'object') {
-                this.playerInventory = { ...this.playerInventory, ...data.playerInventory };
+                this.playerInventory = this.ensureStarterBaitInventory(data.playerInventory);
             }
             if (data.careerStats && typeof data.careerStats === 'object') {
                 this.careerStats = { ...this.careerStats, ...data.careerStats };
@@ -3979,12 +4396,12 @@ export class UIManager {
 
         if (prof && typeof prof.playerMoney === 'number') {
             this.playerMoney = prof.playerMoney;
-            this.playerInventory = prof.playerInventory || { pt_chep_1: 5, kl_sua_ngo: 3, kl_mat_khoai: 3, kl_tuong_sua: 2, sp_luc_huong: 2 };
+            this.playerInventory = this.ensureStarterBaitInventory(prof.playerInventory);
             this.careerStats = prof.careerStats || { totalFish: 0, totalWeight: 0, biggestFish: 0, biggestFishName: '', rungWins: 0, momCount: 0, speciesRecords: {} };
         } else {
-            // Tài khoản mới mặc định đúng 1.000.000đ + mồi khởi đầu + 2 cần khởi đầu!
+            // Tài khoản mới mặc định đúng 1.000.000đ + đủ 12 loại mồi & hương liệu khởi đầu + 2 cần khởi đầu!
             this.playerMoney = 1000000;
-            this.playerInventory = { pt_chep_1: 5, kl_sua_ngo: 3, kl_mat_khoai: 3, kl_tuong_sua: 2, sp_luc_huong: 2 };
+            this.playerInventory = this.getDefaultBaitInventory();
             this.careerStats = { totalFish: 0, totalWeight: 0, biggestFish: 0, biggestFishName: '', rungWins: 0, momCount: 0, speciesRecords: {} };
         }
 
@@ -4103,8 +4520,8 @@ export class UIManager {
         const elem = document.getElementById('prompt-content');
         if (!box || !elem) return;
 
-        // Nếu người chơi đang buông cần canh phao hoặc cá đang cắn, tuyệt đối không hiện khung chữ che tầm nhìn phao
-        if (this.gameplay && (this.gameplay.state === 'FLOAT_WAIT' || this.gameplay.state === 'BITING')) {
+        // Nếu người chơi đang buông cần canh phao, cá đang cắn hoặc đang Bo Cá -> tuyệt đối không hiện khung chữ che tầm nhìn!
+        if (this.gameplay && (this.gameplay.state === 'FLOAT_WAIT' || this.gameplay.state === 'BITING' || this.gameplay.state === 'FIGHTING')) {
             box.style.display = 'none';
             return;
         }
@@ -4242,9 +4659,9 @@ export class UIManager {
         const btnStand = document.getElementById('btn-m-stand');
         const btnZoom = document.getElementById('btn-m-zoom');
 
-        // D-Pad 4 hướng CHỈ hiện khi đang đi bộ (ROAM) hoặc đang bo cá (FIGHTING) — ẩn hoàn toàn lúc ngồi chờ phao!
-        dpad.style.display = (st === 'ROAM' || st === 'FIGHTING') ? 'block' : 'none';
-        // Khi đang bo cá, ẩn cụm action bên phải để nhường toàn bộ không gian cho bảng Bo Cá & chiêu thức!
+        // D-Pad đi bộ góc trái CHỈ hiện khi đang đi bộ (ROAM) — khi bo cá (FIGHTING) ẩn sạch để dùng Nút Tròn gần giữa màn hình!
+        dpad.style.display = (st === 'ROAM') ? 'block' : 'none';
+        // Khi đang bo cá, ẩn toàn bộ cụm nút phụ bên phải để nhìn cá rẽ nước rõ nhất!
         actions.style.display = (st === 'FIGHTING') ? 'none' : 'flex';
 
         if (st === 'ROAM') {
@@ -4789,8 +5206,21 @@ export class UIManager {
             spotNearBanner.style.display = 'none';
         }
 
-        // 2. Seated Controls Panel
+        // Chế độ Màn Hình Sạch Khi Bo Cá: Ẩn toàn bộ bảng nút ngồi bến, top bar, radar, prompt để nhìn cá chạy & dùng Nút Tròn gần giữa màn hình!
+        const isFightingNow = (this.gameplay.state === 'FIGHTING' && !!this.gameplay.hookedFish);
+        if (this.uiRoot) {
+            this.uiRoot.classList.toggle('fighting-clean-view', isFightingNow);
+        }
+        if (!isFightingNow && this._padVisualOffset && this._padVisualOffset.active) {
+            this._padVisualOffset = { dx: 0, dy: 0, active: false };
+            if (this.gameplay && this.gameplay.setFightPadInput) {
+                this.gameplay.setFightPadInput(0, 0, false);
+            }
+        }
+
+        // 2. Seated Controls Panel (Ẩn hoàn toàn khi đang Bo Cá; thu gọn thanh 4 bước khi đã ra cần canh phao!)
         const seatedPanel = document.getElementById('seated-controls');
+        const flowBar = document.getElementById('fishing-flow-bar');
         if (
             this.gameplay.state === 'SEATED' ||
             this.gameplay.state === 'LANDED' ||
@@ -4799,6 +5229,9 @@ export class UIManager {
             this.gameplay.state === 'BITING'
         ) {
             seatedPanel.style.display = 'flex';
+            const isRodOut = (this.gameplay.state === 'CASTING' || this.gameplay.state === 'FLOAT_WAIT' || this.gameplay.state === 'BITING');
+            if (flowBar) flowBar.style.display = isRodOut ? 'none' : 'flex';
+
             document.getElementById('seated-spot-name').innerText = `📍 ${this.gameplay.currentSpotName || 'Bến Câu Đài'}`;
             const baitName = this.gameplay.activeHookBait ? this.gameplay.activeHookBait.name : 'Chưa gắn mồi';
             document.getElementById('seated-bait-info').innerText = `Khay mồi: ${baitName}`;
@@ -4838,10 +5271,10 @@ export class UIManager {
             if (strikeContainer) strikeContainer.style.display = 'none';
         }
 
-        // 4. Fight HUD Gọn Nhẹ (Ẩn khung thông báo chữ để không che tầm nhìn cá chạy rẽ nước & nhảy Santo)
+        // 4. Fight HUD Nút Hình Tròn 360° Gần Giữa Màn Hình (Ẩn sạch các nút khác để nhìn cá bo Trái/Phải/Lên/Xuống dễ dàng!)
         const fightHud = document.getElementById('fight-hud');
         const promptBox = document.getElementById('action-prompt');
-        if (this.gameplay.state === 'FIGHTING' && this.gameplay.hookedFish) {
+        if (isFightingNow) {
             fightHud.style.display = 'block';
             if (promptBox) promptBox.style.display = 'none';
             const fish = this.gameplay.hookedFish;
@@ -4851,67 +5284,151 @@ export class UIManager {
             document.getElementById('stamina-fill').style.width = `${Math.max(0, this.gameplay.fishStamina * 100)}%`;
 
             const phase = this.gameplay.fightPhase;
+            const tension = this.gameplay.lineTension || 0;
             const phaseBadge = document.getElementById('fight-phase-badge');
             const dirBanner = document.getElementById('fight-dir-banner');
             const lblUp = document.getElementById('lbl-fight-up');
+            const lblDown = document.getElementById('lbl-fight-down');
             const surfaceBox = document.getElementById('surface-meter-box');
+            const knobEl = document.getElementById('fight-circle-knob');
+            const knobIco = document.getElementById('fc-knob-ico');
+            const knobTxt = document.getElementById('fc-knob-txt');
+            const circlePadEl = document.getElementById('fight-circle-pad');
 
             const btnUp = document.getElementById('btn-fight-up');
             const btnLeft = document.getElementById('btn-fight-left');
             const btnRight = document.getElementById('btn-fight-right');
             const btnDown = document.getElementById('btn-fight-down');
             [btnUp, btnLeft, btnRight, btnDown].forEach(b => {
-                b.classList.remove('required-key', 'pressed-key');
+                if (b) b.classList.remove('required-key', 'pressed-key');
             });
 
-            if (this.player.keys.forward || this.player.keys.isMouseDown) btnUp.classList.add('pressed-key');
-            if (this.player.keys.left) btnLeft.classList.add('pressed-key');
-            if (this.player.keys.right) btnRight.classList.add('pressed-key');
-            if (this.player.keys.backward) btnDown.classList.add('pressed-key');
+            // Đồng bộ vị trí Núm Tròn ở tâm theo cả Chuột/Cảm ứng kéo lẫn phím W/A/S/D / Mũi tên!
+            const leanVal = this.gameplay.playerRodLean || 0;
+            const vertVal = this.gameplay.playerRodVert || 0;
+            const padState = this._padVisualOffset || { dx: 0, dy: 0, active: false };
+            const knobDx = padState.active ? padState.dx : (leanVal * 44);
+            const knobDy = padState.active ? padState.dy : (-vertVal * 44);
+
+            if (knobEl) {
+                knobEl.style.transform = `translate(calc(-50% + ${knobDx.toFixed(1)}px), calc(-50% + ${knobDy.toFixed(1)}px))`;
+                knobEl.classList.toggle('knob-active', padState.active || Math.abs(leanVal) > 0.15 || Math.abs(vertVal) > 0.15);
+                knobEl.classList.toggle('knob-net-ready', phase === 'TAP_TO_NET');
+            }
+            if (circlePadEl) {
+                circlePadEl.classList.toggle('pad-danger-tension', tension >= 0.78);
+            }
+
+            if (vertVal > 0.22 && btnUp) btnUp.classList.add('pressed-key');
+            if (vertVal < -0.22 && btnDown) btnDown.classList.add('pressed-key');
+            if (leanVal < -0.22 && btnLeft) btnLeft.classList.add('pressed-key');
+            if (leanVal > 0.22 && btnRight) btnRight.classList.add('pressed-key');
+
+            // CẬP NHẬT THANH VẠCH CÂN BẰNG LỰC BO TRÁI / BO PHẢI
+            const bal = Math.max(-1, Math.min(1, this.gameplay.forceBalance || 0));
+            const pull = Math.max(-1, Math.min(1, this.gameplay.fishPullDir || 0));
+            const absBal = Math.abs(bal);
+            const balBox = document.getElementById('balance-gauge-box');
+            const balNeedle = document.getElementById('balance-needle');
+            const balHint = document.getElementById('balance-hint-text');
+            const balVector = document.getElementById('balance-fish-vector');
+
+            if (balBox) {
+                balBox.style.display = (phase === 'TAP_TO_NET') ? 'none' : 'block';
+                balBox.classList.remove('bal-state-sweet', 'bal-state-warn', 'bal-state-danger');
+                if (absBal <= 0.36) balBox.classList.add('bal-state-sweet');
+                else if (absBal <= 0.74) balBox.classList.add('bal-state-warn');
+                else balBox.classList.add('bal-state-danger');
+            }
+            if (balNeedle) {
+                balNeedle.style.left = `${(50 + bal * 46).toFixed(1)}%`;
+            }
+            if (balVector) {
+                const vecPct = Math.abs(pull) * 42;
+                balVector.style.left = pull < 0 ? `${(50 - vecPct).toFixed(1)}%` : '50%';
+                balVector.style.width = `${vecPct.toFixed(1)}%`;
+            }
+            if (balHint) {
+                if (tension >= 0.80 && phase !== 'UNDER_PIER' && phase !== 'TAP_TO_NET') {
+                    balHint.innerText = '🚨 CƯỚC CĂNG ĐỎ! Kéo nút tròn XUỐNG [▼ HẠ NHẢ] xả lực ngay!';
+                } else if (absBal <= 0.36) {
+                    balHint.innerText = '🎯 CÂN BẰNG CHUẨN! Kéo [▲ GHÌ LÊN] để thu cá vào bờ';
+                } else if (absBal <= 0.74) {
+                    balHint.innerText = bal < 0
+                        ? '⬅️ Lệch TRÁI ➔ Kéo nút tròn sang [PHẢI ▶]'
+                        : '➡️ Lệch PHẢI ➔ Kéo nút tròn sang [◀ TRÁI]';
+                } else {
+                    balHint.innerText = bal < 0
+                        ? '🚨 THẲNG CẦN TRÁI! Kéo gấp sang [PHẢI ▶]!'
+                        : '🚨 THẲNG CẦN PHẢI! Kéo gấp sang [◀ TRÁI]!';
+                }
+            }
+
+            if (lblDown) {
+                lblDown.innerText = phase === 'TAP_TO_NET' ? 'HỚT VỢT' : (tension >= 0.76 ? 'XẢ CĂNG!' : 'HẠ NHẢ');
+            }
+            if (knobIco && knobTxt) {
+                if (phase === 'TAP_TO_NET') {
+                    knobIco.innerText = '🕸️';
+                    knobTxt.innerText = 'HỚT CÁ!';
+                } else {
+                    knobIco.innerText = '✊';
+                    knobTxt.innerText = 'GHÌ & BO';
+                }
+            }
 
             const hazard = this.gameplay.stakeHazard;
             if (hazard) {
-                phaseBadge.innerText = `⚠️ CỰC NGUY HIỂM: CÁ LAO CỌC BÊN ${hazard.side === 'LEFT' ? 'TRÁI' : 'PHẢI'}! GIỮ [${hazard.side === 'LEFT' ? '➡️ PHẢI' : '⬅️ TRÁI'}] (${hazard.timeLeft.toFixed(1)}s)`;
+                phaseBadge.innerText = `⚠️ LAO CỌC ${hazard.side === 'LEFT' ? 'TRÁI' : 'PHẢI'} ➔ KÉO ${hazard.side === 'LEFT' ? 'PHẢI ▶' : '◀ TRÁI'} (${hazard.timeLeft.toFixed(1)}s)`;
                 phaseBadge.className = 'fight-phase-tag fight-phase-hazard';
-                if (hazard.requiredKey === 'right') btnRight.classList.add('required-key');
-                else if (hazard.requiredKey === 'left') btnLeft.classList.add('required-key');
+                if (hazard.requiredKey === 'right' && btnRight) btnRight.classList.add('required-key');
+                else if (hazard.requiredKey === 'left' && btnLeft) btnLeft.classList.add('required-key');
                 surfaceBox.style.display = 'none';
             } else {
                 phaseBadge.className = 'fight-phase-tag';
-                const santoTag = this.gameplay.isSantoJumping ? ' 🤸 CÁ SANTO!' : '';
+                const santoTag = this.gameplay.isSantoJumping ? ' 🤸 SANTO!' : '';
+                if (bal < -0.22 && phase !== 'TAP_TO_NET' && btnRight) btnRight.classList.add('required-key');
+                else if (bal > 0.22 && phase !== 'TAP_TO_NET' && btnLeft) btnLeft.classList.add('required-key');
+
+                if ((tension >= 0.78 || this.gameplay.isSantoJumping) && phase !== 'UNDER_PIER' && btnDown) {
+                    btnDown.classList.add('required-key');
+                }
+
                 if (phase === 'RUN_OUT') {
-                    phaseBadge.innerText = `⬆️ DỰNG CẦN hoặc 🐉 NGỰ LONG (Q) / 🌊 HẠ NGƯ (C)${santoTag}`;
-                    lblUp.innerText = 'Dựng';
-                    btnUp.classList.add('required-key');
+                    phaseBadge.innerText = tension >= 0.78
+                        ? `🚨 CĂNG CƯỚC ➔ KÉO ▼ HẠ NHẢ!${santoTag}`
+                        : `▲ KÉO LÊN GHÌ CẦN + BO ◀/▶${santoTag}`;
+                    if (lblUp) lblUp.innerText = 'GHÌ LÊN';
+                    if (tension < 0.78 && btnUp) btnUp.classList.add('required-key');
                     surfaceBox.style.display = 'none';
                 } else if (phase === 'UNDER_PIER') {
-                    phaseBadge.innerText = `⚠️ CÁ CHUI CHÂN CẦU! GIỮ ⬆️ LÊN DỰNG CẦN NGAY! (${Math.max(0, this.gameplay.underPierTimer || 0).toFixed(1)}s)`;
+                    phaseBadge.innerText = `⚠️ CHUI GẦM CẦU! KÉO ▲ LÊN NGAY (${Math.max(0, this.gameplay.underPierTimer || 0).toFixed(1)}s)`;
                     phaseBadge.className = 'fight-phase-tag fight-phase-hazard';
-                    lblUp.innerText = 'DỰNG GẤP!';
-                    btnUp.classList.add('required-key');
+                    if (lblUp) lblUp.innerText = 'DỰNG GẤP!';
+                    if (btnUp) btnUp.classList.add('required-key');
                     surfaceBox.style.display = 'none';
                 } else if (phase === 'RUN_LEFT') {
-                    phaseBadge.innerText = `⬅️ GIỮ TRÁI: GHÌM TRÁI${santoTag}`;
-                    lblUp.innerText = 'Dựng';
-                    btnLeft.classList.add('required-key');
+                    phaseBadge.innerText = `🐟 Cá lôi TRÁI ➔ Kéo [PHẢI ▶]${santoTag}`;
+                    if (lblUp) lblUp.innerText = 'GHÌ LÊN';
+                    if (bal <= -0.10 && btnRight) btnRight.classList.add('required-key');
                     surfaceBox.style.display = 'none';
                 } else if (phase === 'RUN_RIGHT') {
-                    phaseBadge.innerText = `➡️ GIỮ PHẢI: GHÌM PHẢI${santoTag}`;
-                    lblUp.innerText = 'Dựng';
-                    btnRight.classList.add('required-key');
+                    phaseBadge.innerText = `🐟 Cá lôi PHẢI ➔ Kéo [◀ TRÁI]${santoTag}`;
+                    if (lblUp) lblUp.innerText = 'GHÌ LÊN';
+                    if (bal >= 0.10 && btnLeft) btnLeft.classList.add('required-key');
                     surfaceBox.style.display = 'none';
                 } else if (phase === 'PIN_SURFACE') {
-                    phaseBadge.innerText = '🌊 GIỮ LÊN: GHÌ CÁ NỔI';
-                    lblUp.innerText = 'Ghì Nổi';
-                    btnUp.classList.add('required-key');
+                    phaseBadge.innerText = '🌊 KÉO ▲ LÊN: GHÌ CÁ NGỬA BỤNG';
+                    if (lblUp) lblUp.innerText = 'GHÌ NỔI';
+                    if (btnUp) btnUp.classList.add('required-key');
                     surfaceBox.style.display = 'flex';
                     const pct = Math.round((this.gameplay.surfaceProgress || 0) * 100);
                     document.getElementById('surface-pct').innerText = `${pct}%`;
                     document.getElementById('surface-fill').style.width = `${pct}%`;
                 } else if (phase === 'TAP_TO_NET') {
-                    phaseBadge.innerText = '🕸️ BẤM SPACE / ⬇️ HỚT CÁ!';
-                    lblUp.innerText = 'Ghì Nổi';
-                    btnDown.classList.add('required-key');
+                    phaseBadge.innerText = '🕸️ BẤM TÂM TRÒN / ▼ HỚT CÁ!';
+                    if (lblUp) lblUp.innerText = 'GHÌ NỔI';
+                    if (btnDown) btnDown.classList.add('required-key');
                     surfaceBox.style.display = 'flex';
                     document.getElementById('surface-pct').innerText = '100%';
                     document.getElementById('surface-fill').style.width = '100%';
@@ -4930,31 +5447,35 @@ export class UIManager {
             if (btnNgu) {
                 const cd = this.gameplay.nguLongCooldown || 0;
                 btnNgu.disabled = cd > 0;
-                btnNgu.innerText = cd > 0 ? `🐉 Ngự Long (${cd.toFixed(1)}s)` : '🐉 NGỰ LONG (Q)';
+                btnNgu.innerText = cd > 0 ? `🐉 ${cd.toFixed(0)}s` : '🐉 Q';
                 btnNgu.classList.toggle('skill-recommended', cd <= 0 && phase === 'RUN_OUT');
             }
             const btnHa = document.getElementById('btn-skill-hangu');
             if (btnHa) {
                 const cd = this.gameplay.haNguCooldown || 0;
                 btnHa.disabled = cd > 0;
-                btnHa.innerText = cd > 0 ? `🌊 Hạ Ngư (${cd.toFixed(1)}s)` : '🌊 HẠ NGƯ (C)';
+                btnHa.innerText = cd > 0 ? `🌊 ${cd.toFixed(0)}s` : '🌊 C';
                 btnHa.classList.toggle('skill-recommended', cd <= 0 && phase === 'RUN_OUT');
             }
             const btnLeash = document.getElementById('btn-skill-leash');
             if (btnLeash) {
                 const avail = !!this.gameplay.safetyLeashAvailable;
                 btnLeash.disabled = !avail;
-                btnLeash.innerText = avail ? '🪢 BẢO HIỂM (X)' : '🪢 Đã dùng';
-                btnLeash.classList.toggle('skill-recommended', avail && (this.gameplay.lineTension || 0) >= 0.78);
+                btnLeash.innerText = avail ? '🪢 X' : '🪢--';
+                btnLeash.classList.toggle('skill-recommended', avail && tension >= 0.78);
             }
 
             const btnNet = document.getElementById('btn-net-action');
-            if (phase === 'TAP_TO_NET') {
-                btnNet.disabled = false;
-                btnNet.classList.add('pulse');
-            } else {
-                btnNet.disabled = true;
-                btnNet.classList.remove('pulse');
+            if (btnNet) {
+                if (phase === 'TAP_TO_NET') {
+                    btnNet.style.display = 'inline-flex';
+                    btnNet.disabled = false;
+                    btnNet.classList.add('pulse');
+                } else {
+                    btnNet.style.display = 'none';
+                    btnNet.disabled = true;
+                    btnNet.classList.remove('pulse');
+                }
             }
         } else {
             fightHud.style.display = 'none';

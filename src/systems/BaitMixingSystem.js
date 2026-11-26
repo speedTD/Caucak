@@ -1,21 +1,48 @@
-// Hệ thống Pha Mồi Câu Đài Chuyên Nghiệp (Áp dụng Quy Tắc Nước Đục / Nước Trong & Nồng Độ Hương Liệu)
+// Hệ thống Chậu Pha Mồi Câu Đài Thực Tế Việt Nam
+// Hỗ trợ 3 Loại Câu (Câu Cám / Câu Ốc / Câu Ngô) • Bỏ đa nguyên liệu vào Chậu • Kiểm tra Tỷ Lệ Vàng & Nặng Mùi Đè Phao
+
+export const FISHING_MODES = {
+    CAM: {
+        id: 'CAM',
+        icon: '🥣',
+        label: 'Câu Cám',
+        shortTitle: 'Phối Cám Nền + Hương Liệu Cám',
+        ruleHint: 'Dùng Cám Nền (Thơm / Tanh / Thơm Tanh) phối Mật Khoai, Tương Sữa Thơm, Lục Hương, Sữa Ngô (4–8 giọt / 1kg cám).'
+    },
+    SNAIL: {
+        id: 'SNAIL',
+        icon: '🐚',
+        label: 'Câu Ốc',
+        shortTitle: 'Ủ Ốc Bươu / Ốc Vặn + Cám + Rượu Thuốc Bắc',
+        ruleHint: 'Tỷ lệ hợp lý: 5–10 giọt Rượu Thuốc Bắc / 1kg cám ủ ốc. Pha > 10 giọt/1kg sẽ làm nặng mùi, cá cày nhiều tăm và chỉ đè phao!'
+    },
+    CORN: {
+        id: 'CORN',
+        icon: '🌽',
+        label: 'Câu Ngô',
+        shortTitle: 'Ủ Ngô Ngọt + Nước Xanh chuyên dụng',
+        ruleHint: 'Tỷ lệ hợp lý: 10 bắp Ngô Ngọt pha 5ml–10ml Nước Xanh (0.5–1ml/bắp). Pha nhiều hơn sẽ làm nặng mùi, cá cày chỉ đè phao!'
+    }
+};
 
 export class BaitMixingSystem {
     constructor() {
         this.currentMix = {
-            baseBait: null,
-            baseWeight: 200, // gram
-            flavors: {},     // itemId: drops
-            waterRatio: 0.8, // 1 phần mồi : 0.8 phần nước
-            baitFirmness: 'MEDIUM', // 'SOFT' (Vê Mềm Bung Sương) | 'MEDIUM' (Vê Dẻo Chuẩn) | 'HARD' (Vê Chặt Chống Rỉa)
-            rigStyle: 'STANDARD',   // 'SENSITIVE' (Cân 7 Câu 2 Nhạy) | 'STANDARD' (Cân 5 Câu 3 Đáy) | 'HEAVY_LEAD' (Chì Nằm Đáy Săn Hàng)
-            mixType: 'dual'
+            fishingMode: 'CAM', // 'CAM' | 'SNAIL' | 'CORN'
+            basinItems: {       // Nguyên liệu đã đổ vào chậu: { [itemId]: số kg hoặc số bắp }
+                cam_nen_thom_tanh: 1.0
+            },
+            flavors: {},        // Hương liệu đã nhỏ vào chậu: { [flavorId]: số giọt hoặc số ml }
+            waterRatio: 0.8,    // Tỉ lệ nước trộn mồi
+            baitFirmness: 'MEDIUM', // 'SOFT' | 'MEDIUM' | 'HARD'
+            rigStyle: 'STANDARD',
+            baseBait: null      // Tương thích ngược
         };
 
-        // Khởi đầu KHAY MỒI TRỐNG: Bắt buộc người chơi phải pha mồi, vê mồi & cân phao trước khi ra cần!
+        // Khởi đầu KHAY MỒI TRỐNG: Bắt buộc người chơi chọn loại câu, bỏ đồ vào chậu & pha chế trước khi ra cần
         this.mixedBaits = {
-            hookBait: null,   // Mồi vê câu (null cho tới khi pha)
-            groundBait: null  // Mồi xả tụ ổ (null cho tới khi pha)
+            hookBait: null,
+            groundBait: null
         };
 
         this.savedRecipes = [];
@@ -24,6 +51,51 @@ export class BaitMixingSystem {
     resetTray() {
         this.mixedBaits.hookBait = null;
         this.mixedBaits.groundBait = null;
+    }
+
+    setFishingMode(mode, autoSeedIfInvalid = true) {
+        if (!FISHING_MODES[mode]) return;
+        this.currentMix.fishingMode = mode;
+
+        if (autoSeedIfInvalid) {
+            const b = this.currentMix.basinItems || {};
+            const camKg = (b.cam_nen_thom || 0) + (b.cam_nen_tanh || 0) + (b.cam_nen_thom_tanh || 0);
+            const snailKg = (b.oc_van || 0) + (b.oc_buou || 0);
+            const cornCobs = b.ngo_ngot || 0;
+
+            if (mode === 'CAM' && camKg <= 0) {
+                this.currentMix.basinItems = { cam_nen_thom_tanh: 1.0 };
+                this.currentMix.flavors = {};
+                this.currentMix.waterRatio = 0.8;
+            } else if (mode === 'SNAIL' && snailKg <= 0) {
+                this.currentMix.basinItems = { cam_nen_thom_tanh: 1.0, oc_buou: 1.0 };
+                this.currentMix.flavors = { hl_ruou_thuoc_bac: 7 };
+                this.currentMix.waterRatio = 0.7;
+            } else if (mode === 'CORN' && cornCobs <= 0) {
+                this.currentMix.basinItems = { ngo_ngot: 10 };
+                this.currentMix.flavors = { hl_nuoc_xanh: 7 };
+                this.currentMix.waterRatio = 0.65;
+            }
+        }
+    }
+
+    clearBasin() {
+        this.currentMix.basinItems = {};
+        this.currentMix.flavors = {};
+    }
+
+    setBasinItemAmount(itemId, amount, step = 0.5) {
+        if (!this.currentMix.basinItems) this.currentMix.basinItems = {};
+        const rounded = step >= 1 ? Math.round(amount) : Math.round(amount * 2) / 2;
+        if (rounded <= 0) {
+            delete this.currentMix.basinItems[itemId];
+        } else {
+            this.currentMix.basinItems[itemId] = Number(rounded.toFixed(2));
+        }
+    }
+
+    getBasinItemAmount(itemId) {
+        return (this.currentMix.basinItems && this.currentMix.basinItems[itemId]) || 0;
     }
 
     setBaitFirmness(firmness) {
@@ -36,17 +108,20 @@ export class BaitMixingSystem {
 
     setBaseBait(item) {
         this.currentMix.baseBait = item;
+        if (item && item.id) {
+            const step = item.unitStep || 1;
+            if (!this.currentMix.basinItems || Object.keys(this.currentMix.basinItems).length === 0) {
+                this.currentMix.basinItems = { [item.id]: step >= 1 ? 5 : 1.0 };
+            }
+        }
     }
 
-    setBaseWeight(weight) {
-        this.currentMix.baseWeight = Math.max(100, Math.min(1000, weight));
-    }
-
-    setFlavorDrops(flavorId, drops) {
-        if (drops <= 0) {
+    setFlavorDrops(flavorId, amount) {
+        const clean = Math.round(amount * 10) / 10;
+        if (clean <= 0) {
             delete this.currentMix.flavors[flavorId];
         } else {
-            this.currentMix.flavors[flavorId] = drops;
+            this.currentMix.flavors[flavorId] = clean;
         }
     }
 
@@ -54,309 +129,520 @@ export class BaitMixingSystem {
         this.currentMix.waterRatio = Math.round(ratio * 100) / 100;
     }
 
-    // Tính toán hệ số thu hút thực tế của mồi theo Độ Đục Của Nước (Trời Mưa Nước Đục vs Trời Nắng Nước Trong)
-    static getWaterFlavorEffect(totalFlavorDrops = 3, weather = 'SUNNY') {
-        if (weather === 'RAINY') {
-            // QUY TẮC CÂU ĐÀI KHI TRỜI MƯA - NƯỚC ĐỤC PHÙ SA:
-            // Nước đục cản mùi -> Hương liệu ĐẬM (>= 6 giọt) xuyên nước đục thu hút cá cực mạnh!
-            // Hương liệu NHẠT (<= 3 giọt) bị bùn đất lấn át -> Thu hút cá ít hơn hẳn!
-            if (totalFlavorDrops >= 6) {
-                return {
-                    multiplier: 1.42,
-                    scoreDelta: +22,
-                    bigCarpDelta: +26,
-                    radiusDelta: +10,
-                    statusTag: '🔥 RẤT HỢP NƯỚC ĐỤC (Hương Liệu Đậm)',
-                    feedback: `🌧️ Nước Đục + Hương Liệu Đậm (${totalFlavorDrops} giọt): Xuyên tầng nước đục cực mạnh, thu hút cá nhiều hơn (+42%)!`
-                };
-            } else if (totalFlavorDrops <= 3) {
-                return {
-                    multiplier: 0.55,
-                    scoreDelta: -24,
-                    bigCarpDelta: -18,
-                    radiusDelta: -5,
-                    statusTag: '⚠️ HƯƠNG LIỆU NHẠT SO VỚI NƯỚC ĐỤC',
-                    feedback: `⚠️ Nước Đục + Hương Liệu Nhạt (${totalFlavorDrops} giọt): Mùi bị bùn phù sa lấn át, thu hút cá ít hơn (-45%)! Hãy pha đậm ≥ 6 giọt!`
-                };
-            } else {
-                return {
-                    multiplier: 0.95,
-                    scoreDelta: +4,
-                    bigCarpDelta: +5,
-                    radiusDelta: +2,
-                    statusTag: '🌧️ TẠM ĐỦ CHO NƯỚC ĐỤC',
-                    feedback: `🌧️ Nước Đục + Hương Liệu Vừa (${totalFlavorDrops} giọt): Tạm ổn, nhưng tăng lên ≥ 6 giọt sẽ thu hút cá mạnh hơn nhiều!`
-                };
-            }
-        } else if (weather === 'CLOUDY') {
-            // QUY TẮC CÂU ĐÀI KHI TRỜI NHIỀU MÂY MÁT MẺ:
-            // Ánh sáng dịu, cá đi ăn đều — hương liệu trung bình (3 - 7 giọt) đạt hiệu quả tối ưu!
-            if (totalFlavorDrops >= 3 && totalFlavorDrops <= 7) {
-                return {
-                    multiplier: 1.24,
-                    scoreDelta: +12,
-                    bigCarpDelta: +14,
-                    radiusDelta: +5,
-                    statusTag: '⛅ CHUẨN TRỜI NHIỀU MÂY (Hương Vừa Đủ)',
-                    feedback: `⛅ Trời Nhiều Mây + Hương Liệu Vừa (${totalFlavorDrops} giọt): Mùi lan tỏa êm dịu rất hợp cá đi ăn đều (+24%)!`
-                };
-            } else if (totalFlavorDrops > 8) {
-                return {
-                    multiplier: 0.72,
-                    scoreDelta: -14,
-                    bigCarpDelta: -18,
-                    radiusDelta: -2,
-                    statusTag: '⚠️ HƠI GẮT MÙI TRỜI MÁT',
-                    feedback: `⚠️ Trời Nhiều Mây + Hương Liệu Quá Đậm (${totalFlavorDrops} giọt): Cá cũ dễ sặc mùi, nên giảm còn 3–7 giọt!`
-                };
-            } else {
-                return {
-                    multiplier: 0.96,
-                    scoreDelta: +2,
-                    bigCarpDelta: +4,
-                    radiusDelta: +1,
-                    statusTag: '⛅ MÙI DỊU TỰ NHIÊN',
-                    feedback: `⛅ Trời Nhiều Mây + Hương Nhẹ (${totalFlavorDrops} giọt): Cá ăn tự nhiên, thêm 1–2 giọt sẽ nhạy ổ hơn.`
-                };
-            }
-        } else {
-            // QUY TẮC CÂU ĐÀI KHI TRỜI NẮNG - NƯỚC TRONG XANH:
-            // Nước trong cá tinh khôn -> Hương liệu dịu/vừa phải (2 - 6 giọt) nhạy nhất; quá đậm (>= 10 giọt) dễ làm cá sốc mùi
-            if (totalFlavorDrops >= 2 && totalFlavorDrops <= 6) {
-                return {
-                    multiplier: 1.22,
-                    scoreDelta: +12,
-                    bigCarpDelta: +10,
-                    radiusDelta: +4,
-                    statusTag: '☀️ CHUẨN NƯỚC TRONG XANH (Dịu Tự Nhiên)',
-                    feedback: `☀️ Nước Trong Xanh + Hương Liệu Vừa Phải (${totalFlavorDrops} giọt): Mùi thơm thanh tự nhiên, cá ăn rất nhạy (+22%)!`
-                };
-            } else if (totalFlavorDrops <= 1) {
-                return {
-                    multiplier: 0.78,
-                    scoreDelta: -10,
-                    bigCarpDelta: -8,
-                    radiusDelta: -3,
-                    statusTag: '⚠️ HƠI NHẠT HƯƠNG LIỆU',
-                    feedback: `☀️ Nước Trong Xanh + Hương Liệu Quá Nhạt (${totalFlavorDrops} giọt): Ít tinh mùi dẫn dụ, thu hút cá chậm hơn.`
-                };
-            } else if (totalFlavorDrops >= 7) {
-                return {
-                    multiplier: 0.72,
-                    scoreDelta: -16,
-                    bigCarpDelta: -12,
-                    radiusDelta: +6,
-                    statusTag: '⚠️ NẶNG HƯƠNG LIỆU (CÁ CÀY TĂM & ĐÈ PHAO)',
-                    feedback: `☀️ Nước Trong + Nặng Hương Liệu (${totalFlavorDrops} giọt): Tinh mùi nồng làm cá sặc mùi tụ lại cày tăm dày đặc quanh ổ, quẹt vây đè phao chìm từ từ rồi nổi lại mà không ăn mồi! Khuyến nghị: dùng 3-5 giọt!`
-                };
-            } else {
-                return {
-                    multiplier: 1.05,
-                    scoreDelta: +6,
-                    bigCarpDelta: +8,
-                    radiusDelta: +5,
-                    statusTag: '☀️ KHÁ TỐT CHO NƯỚC TRONG',
-                    feedback: `☀️ Nước Trong Xanh + Hương Liệu Vừa Đủ (${totalFlavorDrops} giọt): Tỏa mùi tự nhiên, cá hút mồi rất nhạy.`
-                };
-            }
-        }
-    }
+    // Hệ số thu hút thực tế theo Độ Đục Nước & Cờ Quá Liều Nặng Mùi
+    static getWaterFlavorEffect(effectiveDose = 5, weather = 'SUNNY', forceOverdose = null) {
+        const isOver = typeof forceOverdose === 'boolean'
+            ? forceOverdose
+            : (effectiveDose > (weather === 'RAINY' ? 10.5 : (weather === 'CLOUDY' ? 10 : 9.5)));
 
-    // Đánh giá công thức pha mồi
-    analyzeRecipe(shopItemsMap, currentWeather = 'SUNNY') {
-        const base = this.currentMix.baseBait;
-        if (!base) {
+        if (isOver) {
             return {
-                valid: false,
-                message: 'Vui lòng chọn 1 loại Cám Nền (Phú Thành, Cargill...)'
+                multiplier: 0.68,
+                scoreDelta: -20,
+                bigCarpDelta: -18,
+                radiusDelta: +7,
+                statusTag: '🚨 NẶNG MÙI QUÁ LIỀU (CÁ CÀY TĂM & CHỈ ĐÈ PHAO)',
+                feedback: '⚠️ Pha quá liều hương liệu! Mùi hăng nồng khiến đàn cá sặc mùi tụ lại cày nhiều tăm quanh ổ, quẹt vây đè phao chìm từ từ rồi nổi lên mà không chịu nuốt mồi!'
             };
         }
 
-        const flavorList = Object.keys(this.currentMix.flavors).map(id => ({
-            item: shopItemsMap[id],
-            drops: this.currentMix.flavors[id]
-        })).filter(f => f.item);
+        if (weather === 'RAINY') {
+            if (effectiveDose >= 6) {
+                return {
+                    multiplier: 1.40,
+                    scoreDelta: +18,
+                    bigCarpDelta: +22,
+                    radiusDelta: +9,
+                    statusTag: '🌧️ RẤT HỢP NƯỚC ĐỤC (Hương Đậm Xuyên Bùn)',
+                    feedback: '🌧️ Trời Mưa Nước Đục + Tỷ lệ hương đậm chuẩn bài: Mùi xuyên tầng phù sa cực mạnh (+40% tốc độ cuốn ổ)!'
+                };
+            } else if (effectiveDose <= 3) {
+                return {
+                    multiplier: 0.62,
+                    scoreDelta: -16,
+                    bigCarpDelta: -14,
+                    radiusDelta: -4,
+                    statusTag: '⚠️ HƯƠNG HƠI NHẠT SO VỚI NƯỚC ĐỤC',
+                    feedback: '🌧️ Trời mưa nước đục cản mùi: Đang pha hơi nhạt nên cá chậm đánh hơi vào ổ hơn.'
+                };
+            }
+            return {
+                multiplier: 1.06,
+                scoreDelta: +6,
+                bigCarpDelta: +8,
+                radiusDelta: +3,
+                statusTag: '🌧️ HỢP NƯỚC ĐỤC TRỜI MƯA',
+                feedback: '🌧️ Nước đục phù sa: Nồng độ mồi hiện tại dẫn dụ đàn cá vào ổ ổn định.'
+            };
+        }
 
-        const totalFlavorDrops = flavorList.reduce((sum, f) => sum + f.drops, 0);
+        if (weather === 'CLOUDY') {
+            if (effectiveDose >= 4 && effectiveDose <= 10) {
+                return {
+                    multiplier: 1.25,
+                    scoreDelta: +12,
+                    bigCarpDelta: +15,
+                    radiusDelta: +5,
+                    statusTag: '⛅ CHUẨN TRỜI MÁT NHIỀU MÂY',
+                    feedback: '⛅ Trời dịu mát + Tỷ lệ hương liệu hợp lý: Mùi lan tỏa êm, cá đi ăn đều (+25%)!'
+                };
+            }
+            return {
+                multiplier: 0.96,
+                scoreDelta: +2,
+                bigCarpDelta: +4,
+                radiusDelta: +1,
+                statusTag: '⛅ MÙI TỰ NHIÊN DỊU NHẸ',
+                feedback: '⛅ Trời mát: Mồi thơm mộc tự nhiên, thêm chút tinh mùi đúng bài sẽ gom ổ nhanh hơn.'
+            };
+        }
 
-        let totalScore = base.attraction ? base.attraction.carp : 75;
-        let bigCarpScore = base.attraction ? base.attraction.bigCarp : 75;
-        let scentRadius = 12;
-        let detectedCombos = [];
-        let flavorTags = [];
+        // SUNNY (Nước trong xanh)
+        if (effectiveDose >= 4 && effectiveDose <= 10) {
+            return {
+                multiplier: 1.24,
+                scoreDelta: +12,
+                bigCarpDelta: +12,
+                radiusDelta: +4,
+                statusTag: '☀️ CHUẨN NƯỚC TRONG XANH (Đúng Tỷ Lệ Vàng)',
+                feedback: '☀️ Trời nắng nước trong + Pha đúng tỷ lệ hợp lý: Mùi thơm thanh tự nhiên, cá hút mồi cực nhạy (+24%)!'
+            };
+        }
+        return {
+            multiplier: 0.86,
+            scoreDelta: -6,
+            bigCarpDelta: -4,
+            radiusDelta: -2,
+            statusTag: '☀️ MỒI NHẠT TỰ NHIÊN',
+            feedback: '☀️ Nước trong xanh: Mồi hiện khá mộc, pha thêm hương liệu đúng tỷ lệ sẽ tăng mạnh tốc độ cuốn cá.'
+        };
+    }
+
+    // Phân tích toàn diện Chậu Pha Mồi hiện tại
+    analyzeRecipe(shopItemsMap, currentWeather = 'SUNNY') {
+        const mode = this.currentMix.fishingMode || 'CAM';
+        const basin = this.currentMix.basinItems || {};
+        const flavors = this.currentMix.flavors || {};
+
+        const camIds = ['cam_nen_thom', 'cam_nen_tanh', 'cam_nen_thom_tanh'];
+        const snailIds = ['oc_van', 'oc_buou'];
+        const camFlavorIds = ['hl_mat_khoai', 'hl_tuong_sua_thom', 'hl_luc_huong', 'hl_sua_ngo'];
+
+        const camKg = Number(camIds.reduce((s, id) => s + (basin[id] || 0), 0).toFixed(2));
+        const snailKg = Number(snailIds.reduce((s, id) => s + (basin[id] || 0), 0).toFixed(2));
+        const cornCobs = Math.round(basin.ngo_ngot || 0);
+
+        const camFlavorDrops = camFlavorIds.reduce((s, id) => s + (flavors[id] || 0), 0);
+        const ruouDrops = flavors.hl_ruou_thuoc_bac || 0;
+        const nuocXanhMl = flavors.hl_nuoc_xanh || 0;
+        const totalFlavorRaw = Number((camFlavorDrops + ruouDrops + nuocXanhMl).toFixed(1));
+
+        const basinEntries = Object.entries(basin)
+            .filter(([, qty]) => qty > 0)
+            .map(([id, qty]) => ({ item: shopItemsMap[id], id, qty }))
+            .filter(x => x.item);
+
+        const flavorEntries = Object.entries(flavors)
+            .filter(([, amt]) => amt > 0)
+            .map(([id, amt]) => ({ item: shopItemsMap[id], id, amt }))
+            .filter(x => x.item);
+
+        // Kiểm tra điều kiện tối thiểu trong chậu theo Loại Câu
+        if (basinEntries.length === 0) {
+            return {
+                valid: false,
+                fishingMode: mode,
+                camKg, snailKg, cornCobs,
+                basinEntries: [],
+                flavorEntries,
+                message: 'Chậu trộn mồi đang trống! Hãy bỏ nguyên liệu vào chậu trước khi pha chế.'
+            };
+        }
+        if (mode === 'CAM' && camKg <= 0) {
+            return {
+                valid: false,
+                fishingMode: mode,
+                camKg, snailKg, cornCobs,
+                basinEntries,
+                flavorEntries,
+                message: 'Bạn đang chọn [🥣 Câu Cám]: Hãy bỏ ít nhất 0.5kg Cám Nền (Thơm / Tanh / Thơm Tanh) vào chậu!'
+            };
+        }
+        if (mode === 'SNAIL' && snailKg <= 0) {
+            return {
+                valid: false,
+                fishingMode: mode,
+                camKg, snailKg, cornCobs,
+                basinEntries,
+                flavorEntries,
+                message: 'Bạn đang chọn [🐚 Câu Ốc]: Hãy bỏ Ốc Bươu hoặc Ốc Vặn (kèm Cám Nền để ủ) vào chậu!'
+            };
+        }
+        if (mode === 'CORN' && cornCobs <= 0) {
+            return {
+                valid: false,
+                fishingMode: mode,
+                camKg, snailKg, cornCobs,
+                basinEntries,
+                flavorEntries,
+                message: 'Bạn đang chọn [🌽 Câu Ngô]: Hãy bỏ ít nhất 1 bắp Ngô Ngọt vào chậu!'
+            };
+        }
+
+        // Tính điểm nền bình quân gia quyền theo nguyên liệu trong chậu
+        let weightSum = 0;
+        let baseCarp = 0;
+        let baseBig = 0;
+        basinEntries.forEach(({ item, qty }) => {
+            const w = item.subType === 'CORN' ? qty * 0.15 : qty;
+            weightSum += w;
+            baseCarp += (item.attraction ? item.attraction.carp : 82) * w;
+            baseBig += (item.attraction ? item.attraction.bigCarp : 82) * w;
+        });
+        let totalScore = weightSum > 0 ? baseCarp / weightSum : 82;
+        let bigCarpScore = weightSum > 0 ? baseBig / weightSum : 82;
+        let scentRadius = 12 + Math.min(8, weightSum * 2.2);
+
+        const detectedCombos = [];
+        const flavorTags = flavorEntries.map(({ item, amt }) => `${item.name} (${amt}${item.doseUnit === 'ml' ? 'ml' : ' giọt'})`);
+        const ingredientSummary = basinEntries.map(({ item, qty }) => `${qty}${item.unitLabel || 'kg'} ${item.name}`).join(' + ');
+
+        // Đánh giá TỶ LỆ VÀNG & QUÁ LIỀU NẶNG MÙI riêng cho từng chế độ câu
+        let isFlavorOverdose = false;
+        let normalizedFlavorDose = 5;
+        let ratioVerdict = 'NORMAL';
+        let ratioBadge = '';
+        let ratioExplain = '';
+        let flavorSummary = 'Mộc tự nhiên';
+
+        if (mode === 'SNAIL') {
+            // QUY TẮC Ủ ỐC: Rượu Thuốc Bắc 5–10 giọt / 1kg cám hợp lý; > 10 giọt / 1kg -> nặng mùi cá cày chỉ đè phao!
+            const refKg = camKg > 0 ? camKg : snailKg;
+            const ruouPerKg = ruouDrops / Math.max(0.25, refKg);
+            const extraPerKg = (camFlavorDrops + nuocXanhMl * 1.5) / Math.max(0.25, refKg);
+            const totalPerKg = ruouPerKg + extraPerKg;
+            normalizedFlavorDose = Number(totalPerKg.toFixed(1));
+            flavorSummary = ruouDrops > 0
+                ? `${ruouDrops} giọt Rượu Thuốc Bắc / ${refKg}kg ${camKg > 0 ? 'cám' : 'ốc'} (${ruouPerKg.toFixed(1)} giọt/kg)`
+                : (totalFlavorRaw > 0 ? `${totalFlavorRaw} giọt tinh mùi phụ` : 'Ốc mộc chưa ủ');
+
+            if (camKg > 0 && snailKg > 0) {
+                detectedCombos.push(`🐚 Nền Ủ Ốc Chuẩn Đài: ${snailKg}kg Ốc tươi + ${camKg}kg Cám Nền giữ ổ bền bỉ`);
+                totalScore += 6;
+                bigCarpScore += 10;
+            }
+            if (basin.oc_buou > 0 && basin.oc_van > 0) {
+                detectedCombos.push('🐌🐚 Song Ốc Phối Hợp (Ốc Bươu + Ốc Vặn): Vừa xả dụ ổ vừa móc lưỡi săn Trắm Đen');
+                bigCarpScore += 7;
+            }
+
+            if (ruouPerKg > 10 || totalPerKg > 10.5) {
+                isFlavorOverdose = true;
+                ratioVerdict = 'OVERDOSE';
+                ratioBadge = `🚨 QUÁ LIỀU (${ruouPerKg.toFixed(1)} giọt/1kg > 10 giọt/1kg) ➔ NẶNG MÙI ĐÈ PHAO!`;
+                ratioExplain = `⚠️ Bạn đang pha ${ruouDrops} giọt Rượu Thuốc Bắc cho ${refKg}kg ${camKg > 0 ? 'cám' : 'ốc'} (${ruouPerKg.toFixed(1)} giọt/1kg — vượt mức 5–10 giọt/1kg)! Mùi thuốc bắc quá nồng làm cá chỉ cày nhiều tăm và đè phao chứ không ăn!`;
+            } else if (ruouPerKg >= 5 && ruouPerKg <= 10) {
+                isFlavorOverdose = false;
+                ratioVerdict = 'OPTIMAL';
+                const recLabel = Number.isInteger(ruouPerKg) ? ruouPerKg : ruouPerKg.toFixed(1);
+                ratioBadge = `✅ TỶ LỆ VÀNG Ủ ỐC (${recLabel} giọt Rượu Thuốc Bắc / 1kg ${camKg > 0 ? 'cám' : 'ốc'})`;
+                ratioExplain = camKg > 0
+                    ? `🔥 Đạt chuẩn 5–10 giọt Rượu Thuốc Bắc / 1kg cám! Ốc dậy hương thảo mộc đầm sâu, Trắm Đen & Chép Cụ vào ổ hút phao lút hình!`
+                    : `👍 Đúng tỷ lệ 5–10 giọt/kg! Mẹo: Bỏ thêm 1kg Cám Nền vào chậu trộn cùng ốc sẽ thành bài Cám Ủ Ốc đỉnh cao!`;
+                detectedCombos.push('🍶🔥 Bí Kíp Ốc Ủ Rượu Thuốc Bắc (5–10 giọt/1kg): Sát Thủ Trắm Đen & Chép Cụ!');
+                totalScore += 16;
+                bigCarpScore += 24;
+                scentRadius += 8;
+            } else if (ruouDrops > 0 && ruouPerKg < 5) {
+                isFlavorOverdose = false;
+                ratioVerdict = 'LIGHT';
+                const minD = Math.ceil(5 * refKg);
+                const maxD = Math.floor(10 * refKg);
+                ratioBadge = `💡 HƠI NHẠT RƯỢU THUỐC BẮC (${ruouPerKg.toFixed(1)} giọt / 1kg)`;
+                ratioExplain = `Với ${refKg}kg ${camKg > 0 ? 'cám' : 'ốc'} trong chậu, nên nhỏ từ ${minD}–${maxD} giọt Rượu Thuốc Bắc (tỷ lệ 5–10 giọt/1kg cám) để đạt độ bén tối đa.`;
+                totalScore += 4;
+                bigCarpScore += 6;
+            } else {
+                isFlavorOverdose = false;
+                ratioVerdict = 'PLAIN';
+                const minD = Math.ceil(5 * refKg);
+                const maxD = Math.floor(10 * refKg);
+                ratioBadge = '🐚 ỐC TƯƠI MỘC (Chưa có Rượu Thuốc Bắc)';
+                ratioExplain = `Gợi ý: Nhỏ thêm ${minD}–${maxD} giọt Rượu Thuốc Bắc (chuẩn 5–10 giọt / 1kg cám) để kích thích cá lớn mở miệng nhanh hơn!`;
+            }
+        } else if (mode === 'CORN') {
+            // QUY TẮC Ủ NGÔ: 10 bắp Ngô Ngọt pha 5ml–10ml Nước Xanh hợp lý; > 10ml/10 bắp -> nặng mùi cá cày chỉ đè phao!
+            const mlPer10Cobs = (nuocXanhMl / Math.max(1, cornCobs)) * 10;
+            const extraPer10 = ((camFlavorDrops + ruouDrops) / Math.max(1, cornCobs)) * 10;
+            const totalPer10 = mlPer10Cobs + extraPer10;
+            normalizedFlavorDose = Number(totalPer10.toFixed(1));
+            const minMl = Number((cornCobs * 0.5).toFixed(1));
+            const maxMl = Number((cornCobs * 1.0).toFixed(1));
+            flavorSummary = nuocXanhMl > 0
+                ? `${nuocXanhMl}ml Nước Xanh / ${cornCobs} bắp (${mlPer10Cobs.toFixed(1)}ml/10 bắp)`
+                : (totalFlavorRaw > 0 ? `${totalFlavorRaw} giọt tinh mùi phụ` : 'Ngô ngọt mộc');
+
+            if (mlPer10Cobs > 10 || totalPer10 > 10.5) {
+                isFlavorOverdose = true;
+                ratioVerdict = 'OVERDOSE';
+                ratioBadge = `🚨 QUÁ LIỀU NƯỚC XANH (${mlPer10Cobs.toFixed(1)}ml / 10 bắp) ➔ NẶNG MÙI ĐÈ PHAO!`;
+                ratioExplain = `⚠️ Đang pha ${nuocXanhMl}ml Nước Xanh cho ${cornCobs} bắp ngô (tương đương ${mlPer10Cobs.toFixed(1)}ml/10 bắp — vượt ngưỡng 5–10ml/10 bắp)! Mùi nồng gắt khiến cá cày tăm mù mịt và chỉ đè phao không ăn!`;
+            } else if (mlPer10Cobs >= 5 && mlPer10Cobs <= 10) {
+                isFlavorOverdose = false;
+                ratioVerdict = 'OPTIMAL';
+                const cleanRate = Number.isInteger(mlPer10Cobs) ? mlPer10Cobs : mlPer10Cobs.toFixed(1);
+                ratioBadge = `✅ TỶ LỆ VÀNG Ủ NGÔ (${cleanRate}ml Nước Xanh / 10 bắp)`;
+                ratioExplain = `🔥 Chuẩn tỷ lệ 10 bắp Ngô Ngọt : 5ml–10ml Nước Xanh! Hạt ngô ngấm vị xanh ngọt thanh, Chép Củ & Trắm Cỏ cực mê!`;
+                detectedCombos.push('🌽🧪 Tuyệt Chiêu Ngô Ngọt Ủ Nước Xanh (5–10ml/10 bắp): Chuyên Chép Củ & Trắm Cỏ!');
+                totalScore += 15;
+                bigCarpScore += 22;
+                scentRadius += 8;
+            } else if (nuocXanhMl > 0 && mlPer10Cobs < 5) {
+                isFlavorOverdose = false;
+                ratioVerdict = 'LIGHT';
+                ratioBadge = `💡 HƠI ÍT NƯỚC XANH (${mlPer10Cobs.toFixed(1)}ml / 10 bắp)`;
+                ratioExplain = `Với ${cornCobs} bắp Ngô Ngọt hiện tại, đong từ ${minMl}ml – ${maxMl}ml Nước Xanh (chuẩn 5–10ml / 10 bắp) sẽ đạt đỉnh hiệu quả!`;
+                totalScore += 4;
+                bigCarpScore += 5;
+            } else {
+                isFlavorOverdose = false;
+                ratioVerdict = 'PLAIN';
+                ratioBadge = '🌽 NGÔ NGỌT TƯƠI (Chưa pha Nước Xanh)';
+                ratioExplain = `Gợi ý: Đong ${minMl}ml – ${maxMl}ml Nước Xanh cho ${cornCobs} bắp ngô trong chậu (tỷ lệ vàng 5–10ml / 10 bắp)!`;
+            }
+        } else {
+            // QUY TẮC CÂU CÁM: Dùng Mật Khoai, Tương Sữa Thơm, Lục Hương, Sữa Ngô (4–9 giọt / 1kg cám)
+            const camDropsPerKg = camFlavorDrops / Math.max(0.25, camKg);
+            const offModePerKg = (ruouDrops * 1.25 + nuocXanhMl * 1.35) / Math.max(0.25, camKg);
+            const totalPerKg = camDropsPerKg + offModePerKg;
+            normalizedFlavorDose = Number(totalPerKg.toFixed(1));
+            const safeMax = currentWeather === 'RAINY' ? 10 : 9;
+            flavorSummary = totalFlavorRaw > 0
+                ? `${camFlavorDrops} giọt hương cám / ${camKg}kg cám (${totalPerKg.toFixed(1)} giọt/kg)`
+                : 'Cám nền mộc';
+
+            // Phát hiện combo phối hương cám thực tế
+            const activeCamFlavors = camFlavorIds.filter(id => (flavors[id] || 0) > 0);
+            if ((flavors.hl_mat_khoai || 0) > 0 && (flavors.hl_sua_ngo || 0) > 0) {
+                detectedCombos.push('🍠🌽 Combo Quốc Dân: Mật Khoai + Sữa Ngô (Chép Mới & Chép Cũ Đều Mê)');
+                totalScore += 10;
+                bigCarpScore += 12;
+                scentRadius += 5;
+            }
+            if ((flavors.hl_luc_huong || 0) > 0 && (flavors.hl_tuong_sua_thom || 0) > 0) {
+                detectedCombos.push('🌿🥛 Combo Đấu Giải: Lục Hương + Tương Sữa Thơm (Tỏa Mây Sữa Xuyên Tầng Nước)');
+                totalScore += 12;
+                bigCarpScore += 10;
+                scentRadius += 7;
+            }
+            if ((basin.cam_nen_thom || 0) > 0 && (basin.cam_nen_tanh || 0) > 0) {
+                detectedCombos.push('🌾🦐 Phối Cám Thủ Công: Cám Nền Thơm + Cám Nền Tanh đa tầng vị');
+                totalScore += 5;
+            }
+
+            if (totalPerKg > safeMax) {
+                isFlavorOverdose = true;
+                ratioVerdict = 'OVERDOSE';
+                ratioBadge = `🚨 NẶNG HƯƠNG LIỆU CÁM (${totalPerKg.toFixed(1)} giọt/1kg) ➔ CÁ CÀY ĐÈ PHAO!`;
+                ratioExplain = `⚠️ Đang pha vượt ngưỡng ${safeMax} giọt / 1kg cám! Tinh mùi quá gắt làm cá sặc mùi cày nhiều tăm quanh phao và chỉ quẹt dây đè phao chìm dần rồi nổi lên!`;
+            } else if (camDropsPerKg >= 4 && camDropsPerKg <= safeMax && offModePerKg <= 2) {
+                isFlavorOverdose = false;
+                ratioVerdict = 'OPTIMAL';
+                ratioBadge = `✅ TỶ LỆ CÁM HỢP LÝ (${camDropsPerKg.toFixed(1).replace('.0', '')} giọt / 1kg cám • ${activeCamFlavors.length} vị)`;
+                ratioExplain = `🔥 Hương liệu chuyên Cám hòa quyện vừa vặn với ${camKg}kg cám nền, mồi bung tơi dẫn dụ cá ăn dứt khoát!`;
+                totalScore += 10;
+                bigCarpScore += 8;
+            } else if (offModePerKg > 2) {
+                isFlavorOverdose = false;
+                ratioVerdict = 'LIGHT';
+                ratioBadge = '⚠️ LỆCH VỊ HƯƠNG LIỆU CHO CÁM';
+                ratioExplain = 'Rượu Thuốc Bắc hợp ủ Ốc, Nước Xanh hợp pha Ngô. Với Câu Cám hãy ưu tiên Mật Khoai, Tương Sữa Thơm, Lục Hương, Sữa Ngô!';
+                totalScore -= 6;
+            } else {
+                isFlavorOverdose = false;
+                ratioVerdict = 'LIGHT';
+                const minD = Math.ceil(4 * camKg);
+                const maxD = Math.floor(8 * camKg);
+                ratioBadge = camFlavorDrops === 0 ? '🥣 CÁM NỀN MỘC CHƯA PHA HƯƠNG LIỆU' : `💡 HƯƠNG DỊU NHẸ (${camDropsPerKg.toFixed(1)} giọt / 1kg cám)`;
+                ratioExplain = `Gợi ý: Với ${camKg}kg Cám Nền trong chậu, nhỏ tổng cộng ${minD}–${maxD} giọt (Mật Khoai / Tương Sữa Thơm / Lục Hương / Sữa Ngô) là hợp lý nhất!`;
+            }
+        }
 
         // Kiểm tra tỉ lệ nước trộn mồi
         let textureStatus = '';
         const wRatio = this.currentMix.waterRatio;
         if (wRatio < 0.6) {
-            textureStatus = 'Mồi Rất Khô (Bung xả cực nhanh, thích hợp làm mồi xả đầu hồ)';
-            scentRadius += 6;
+            textureStatus = 'Mồi Rất Khô / Hạt Rời (Bung xả nhanh tầng đáy, hợp xả ổ)';
+            scentRadius += 5;
         } else if (wRatio >= 0.6 && wRatio <= 0.75) {
-            textureStatus = 'Mồi Tơi Xốp (Mồi xả tầng đáy chuẩn đài thủ, lưu ổ bền)';
-            scentRadius += 10;
+            textureStatus = 'Mồi Tơi Xốp Chuẩn Ủ (Giữ hạt ốc/ngô và cám tơi đều dưới đáy)';
+            scentRadius += 8;
         } else if (wRatio > 0.75 && wRatio <= 0.95) {
-            textureStatus = 'Mồi Dẻo Bám Lưỡi Chuẩn (Vê tròn 2 lưỡi câu, tan êm dịu 60-90 giây)';
-            totalScore += 8;
+            textureStatus = 'Mồi Dẻo Bám Lưỡi Chuẩn (Vê 2 lưỡi êm, tan sương 60–90 giây)';
+            totalScore += 6;
         } else {
-            textureStatus = 'Mồi Khá Ướt / Nhão (Dễ rã khi tiếp nước, cần vê nhẹ tay)';
-            totalScore -= 5;
+            textureStatus = 'Mồi Mềm Cháo (Vuốt tơ đánh cá nhát mồi, rã nhanh)';
         }
 
-        const flavorIds = Object.keys(this.currentMix.flavors);
-
-        // Phát hiện các Combo đặc biệt
-        const hasKLSuaNgo = flavorIds.includes('kl_sua_ngo');
-        const hasKLMatKhoai = flavorIds.includes('kl_mat_khoai');
-        const hasKLGaoRuou = flavorIds.includes('kl_gao_ruou');
-        if (hasKLSuaNgo && (hasKLMatKhoai || hasKLGaoRuou)) {
-            detectedCombos.push('🔥 Combo Kim Long: Sữa Ngô + Mật Khoai / Gạo Rượu (Chép Bu Kín Ổ)');
-            totalScore += 16;
-            bigCarpScore += 20;
-            scentRadius += 10;
-        }
-
-        const hasSPLucHuong = flavorIds.includes('sp_luc_huong');
-        const hasSPKhoai = flavorIds.includes('sp_tinh_khoai_lang');
-        const hasSPSuaNon = flavorIds.includes('sp_sua_non');
-        const hasSPGaoRuou = flavorIds.includes('sp_gao_ruou');
-        if (hasSPLucHuong && (hasSPKhoai || hasSPSuaNon || hasSPGaoRuou)) {
-            detectedCombos.push('⭐ Combo Đại Sư Sa Phạm: Lục Hương + Khoai Mật + Sữa Non (Cá Chép Ăn Đậm)');
-            totalScore += 18;
-            bigCarpScore += 22;
-            scentRadius += 12;
-        }
-
-        const hasGUFBo3 = flavorIds.includes('guf_bo_ba_san_hang');
-        const hasGUFMonster = flavorIds.includes('guf_tinh_mui_chep_cu');
-        if (hasGUFBo3 || hasGUFMonster) {
-            detectedCombos.push('👑 Combo GUF Săn Hàng Thủy Quái: Chuyên Bắt Chép Củ 8kg - 18kg!');
-            totalScore += 14;
-            bigCarpScore += 30;
-            scentRadius += 15;
-        }
-
-        const vcFlavors = flavorIds.filter(id => id.startsWith('vc_'));
-        if (vcFlavors.length >= 2) {
-            detectedCombos.push(`🎯 Combo Vua Câu Đa Vị (${vcFlavors.length} vị): Kích Thích Cá Lười Ăn`);
-            totalScore += 14;
-            scentRadius += 9;
-        }
-
-        const isPTBase = base.id.startsWith('pt_');
-        const hasPTSuaNon = flavorIds.includes('pt_sua_non');
-        if (isPTBase && hasPTSuaNon) {
-            detectedCombos.push('🌾 Combo Phú Thành: Cám Chép + Sữa Non Phú Thành (Dân Dã Nhạy Bén)');
-            totalScore += 12;
-            scentRadius += 7;
-        }
-
-        // Cộng điểm từng hương liệu
-        flavorList.forEach(f => {
-            const drops = f.drops;
-            if (f.item.attraction) {
-                totalScore += (f.item.attraction.carp - 75) * 0.14 * Math.min(drops, 10);
-                bigCarpScore += (f.item.attraction.bigCarp - 75) * 0.18 * Math.min(drops, 10);
-            }
-            if (f.item.diffusion) {
-                scentRadius += (f.item.diffusion * 0.04);
-            }
-            flavorTags.push(`${f.item.name} (${drops} giọt)`);
-        });
-
-        // Áp dụng Quy Tắc Tỷ Lệ Hương Liệu theo Màu Nước (Nước Đục vs Nước Trong)
-        const waterEffect = BaitMixingSystem.getWaterFlavorEffect(totalFlavorDrops, currentWeather);
+        const waterEffect = BaitMixingSystem.getWaterFlavorEffect(normalizedFlavorDose, currentWeather, isFlavorOverdose);
         totalScore += waterEffect.scoreDelta;
         bigCarpScore += waterEffect.bigCarpDelta;
         scentRadius += waterEffect.radiusDelta;
 
-        totalScore = Math.max(25, Math.min(100, Math.round(totalScore)));
+        totalScore = Math.max(20, Math.min(100, Math.round(totalScore)));
         bigCarpScore = Math.max(15, Math.min(100, Math.round(bigCarpScore)));
         scentRadius = Math.max(6, Math.round(scentRadius));
 
-        const flavorLevel = totalFlavorDrops >= 7
-            ? `NẶNG HƯƠNG LIỆU (${totalFlavorDrops} giọt)`
-            : totalFlavorDrops >= 4
-                ? `VỪA PHẢI (${totalFlavorDrops} giọt)`
-                : `NHẠT (${totalFlavorDrops} giọt)`;
+        const primaryBaseName = mode === 'SNAIL'
+            ? `Chậu Ốc Ủ (${ingredientSummary})`
+            : (mode === 'CORN'
+                ? `Chậu Ngô Ủ (${ingredientSummary})`
+                : `Chậu Cám Đài (${ingredientSummary})`);
 
         return {
             valid: true,
-            baseName: base.name,
+            fishingMode: mode,
+            baseName: primaryBaseName,
+            ingredientSummary,
+            basinEntries,
+            flavorEntries,
+            camKg,
+            snailKg,
+            cornCobs,
+            ruouDrops,
+            nuocXanhMl,
+            camFlavorDrops,
             totalScore,
             bigCarpScore,
             scentRadius,
-            totalFlavorDrops,
-            flavorLevel,
-            isFlavorOverdose: totalFlavorDrops >= (currentWeather === 'SUNNY' ? 7 : 9),
-            waterRuleFeedback: waterEffect.feedback,
-            waterStatusTag: waterEffect.statusTag,
+            totalFlavorDrops: totalFlavorRaw,
+            normalizedFlavorDose,
+            flavorLevel: flavorSummary,
+            flavorSummary,
+            isFlavorOverdose,
+            ratioVerdict,
+            ratioBadge,
+            ratioExplain,
+            waterMultiplier: waterEffect.multiplier,
+            waterRuleFeedback: `${ratioExplain}`,
+            waterStatusTag: ratioBadge || waterEffect.statusTag,
             textureStatus,
             detectedCombos,
             flavorTags
         };
     }
 
-    // Tiến hành nhào trộn mồi thành phẩm
-    mixBait(shopItemsMap, currentWeather = 'SUNNY') {
+    // Nhào trộn toàn bộ nguyên liệu + hương liệu trong chậu thành Mồi Câu & Mồi Xả
+    mixBait(shopItemsMap, currentWeather = 'SUNNY', playerInventory = null) {
         const analysis = this.analyzeRecipe(shopItemsMap, currentWeather);
-        if (!analysis.valid) return { success: false, message: analysis.message };
+        if (!analysis.valid) {
+            return { success: false, message: analysis.message };
+        }
 
-        // Phân loại khẩu vị mồi: Cám / Ngô ủ hương liệu / Ốc ngâm hương liệu
+        // Kiểm tra tồn kho người chơi trước khi trừ nguyên liệu trong chậu
+        if (playerInventory) {
+            for (const { item, id, qty } of analysis.basinEntries) {
+                const have = Number((playerInventory[id] || 0).toFixed(2));
+                if (have + 1e-6 < qty) {
+                    return {
+                        success: false,
+                        missingItem: item,
+                        neededQty: qty,
+                        haveQty: have,
+                        message: `Kho chưa đủ [${item.name}]! Trong chậu cần ${qty} ${item.unitLabel || 'kg'} nhưng kho chỉ có ${have} ${item.unitLabel || 'kg'}. Hãy mua thêm ngay trên kệ!`
+                    };
+                }
+            }
+            for (const { item, id, amt } of analysis.flavorEntries) {
+                if (amt > 0 && (playerInventory[id] || 0) <= 0) {
+                    return {
+                        success: false,
+                        missingItem: item,
+                        neededQty: 1,
+                        haveQty: 0,
+                        message: `Bạn chưa sở hữu chai [${item.name}] trong kho! Hãy bấm Mua 1 chai để pha chế.`
+                    };
+                }
+            }
+
+            // Trừ lượng nguyên liệu nền đã bỏ vào chậu (giữ chai hương liệu dùng lâu dài nhiều ca)
+            for (const { id, qty } of analysis.basinEntries) {
+                const left = Math.max(0, Number(((playerInventory[id] || 0) - qty).toFixed(2)));
+                playerInventory[id] = left;
+            }
+        }
+
+        // Xác định chuẩn khẩu vị mồi cho hệ thống AI FishProfiles ('CAM' | 'SNAIL' | 'CORN')
         const baitKinds = [];
-        const baseFlavorType = this.currentMix.baseBait.flavorType;
-        if (baseFlavorType === 'snail_protein') baitKinds.push('SNAIL');
-        else if (baseFlavorType === 'fermented_corn') baitKinds.push('CORN');
-        else baitKinds.push('CAM');
-        Object.keys(this.currentMix.flavors).forEach(id => {
-            const it = shopItemsMap[id];
-            if (it && it.flavorType === 'sweet_corn' && !baitKinds.includes('CORN')) baitKinds.push('CORN');
-        });
+        if (analysis.fishingMode === 'SNAIL' || analysis.snailKg > 0) baitKinds.push('SNAIL');
+        if (analysis.fishingMode === 'CORN' || analysis.cornCobs > 0) baitKinds.push('CORN');
+        if (analysis.fishingMode === 'CAM' || (analysis.camKg > 0 && baitKinds.length === 0)) {
+            if (!baitKinds.includes('CAM')) baitKinds.push('CAM');
+        }
+        if ((this.currentMix.flavors.hl_sua_ngo || 0) > 0 && !baitKinds.includes('CORN') && analysis.fishingMode === 'CORN') {
+            baitKinds.push('CORN');
+        }
 
         const firmness = this.currentMix.baitFirmness || 'MEDIUM';
         const rigStyle = this.currentMix.rigStyle || 'STANDARD';
         const firmnessMap = {
-            SOFT: { label: 'Vê Mềm Bung Sương', dissolveTime: 42 },
-            MEDIUM: { label: 'Vê Dẻo Chuẩn Đài', dissolveTime: 72 },
-            HARD: { label: 'Vê Cứng Chống Rỉa', dissolveTime: 110 }
+            SOFT: { label: 'Vê Mềm Bung Sương', dissolveTime: 44 },
+            MEDIUM: { label: 'Vê Dẻo Chuẩn Đài', dissolveTime: 76 },
+            HARD: { label: 'Móc Chắc / Vê Chặt', dissolveTime: 115 }
         };
         const rigMap = {
-            SENSITIVE: 'Cân 7 Câu 2 (Nhạy)',
-            STANDARD: 'Cân 5 Câu 3 (Chuẩn Đáy)',
-            HEAVY_LEAD: 'Chì Nằm Đáy (Săn Hàng)'
+            SENSITIVE: 'Cân Nhạy',
+            STANDARD: 'Cân Chuẩn Đáy',
+            HEAVY_LEAD: 'Cân Tì Đáy Săn Hàng'
         };
         const fInfo = firmnessMap[firmness] || firmnessMap.MEDIUM;
 
+        // Số viên mồi câu & nắm xả tỉ lệ thuận với lượng đồ đã bỏ vào chậu
+        const totalBulk = analysis.camKg + analysis.snailKg + analysis.cornCobs * 0.12;
+        const hookCharges = Math.max(10, Math.min(28, Math.round(10 + totalBulk * 4)));
+        const groundCharges = Math.max(6, Math.min(18, Math.round(5 + totalBulk * 3)));
+
+        const modeMeta = FISHING_MODES[analysis.fishingMode] || FISHING_MODES.CAM;
+
         this.mixedBaits.hookBait = {
-            name: `Mồi Vê ${this.currentMix.baseBait.name} (${analysis.flavorLevel})`,
-            baseName: this.currentMix.baseBait.name,
+            name: `${modeMeta.icon} ${analysis.baseName}`,
+            baseName: analysis.baseName,
+            fishingMode: analysis.fishingMode,
+            ingredientSummary: analysis.ingredientSummary,
             baitKinds,
             attractionRate: analysis.totalScore,
             bigCarpBonus: analysis.bigCarpScore,
             totalFlavorDrops: analysis.totalFlavorDrops,
-            flavorLevel: analysis.flavorLevel,
+            normalizedFlavorDose: analysis.normalizedFlavorDose,
+            flavorLevel: analysis.flavorSummary,
+            flavorSummary: analysis.flavorSummary,
             isFlavorOverdose: analysis.isFlavorOverdose,
+            waterMultiplier: analysis.waterMultiplier,
             scentRadius: analysis.scentRadius,
-            dissolveTime: fInfo.dissolveTime,
+            dissolveTime: (analysis.fishingMode === 'SNAIL' || analysis.fishingMode === 'CORN') ? Math.max(95, fInfo.dissolveTime + 25) : fInfo.dissolveTime,
             baitFirmness: firmness,
             firmnessLabel: fInfo.label,
             rigStyle,
             rigStyleLabel: rigMap[rigStyle] || rigMap.STANDARD,
-            charges: 10,
-            maxCharges: 10,
+            charges: hookCharges,
+            maxCharges: hookCharges,
             combos: analysis.detectedCombos,
             flavorTags: analysis.flavorTags,
             waterRatio: this.currentMix.waterRatio
         };
 
         this.mixedBaits.groundBait = {
-            name: `Mồi Xả ${this.currentMix.baseBait.name} (${analysis.flavorLevel})`,
-            baseName: this.currentMix.baseBait.name,
+            name: `Xả Ổ ${analysis.ingredientSummary}`,
+            baseName: analysis.baseName,
+            fishingMode: analysis.fishingMode,
             totalFlavorDrops: analysis.totalFlavorDrops,
+            normalizedFlavorDose: analysis.normalizedFlavorDose,
+            isFlavorOverdose: analysis.isFlavorOverdose,
             scentRadius: Math.round(analysis.scentRadius * 1.35),
             fishGatherSpeed: 1.0 + (analysis.totalScore / 100),
-            bubbleSpurRate: 1.2 + (analysis.bigCarpScore / 80),
-            charges: 6,
-            maxCharges: 6,
+            bubbleSpurRate: analysis.isFlavorOverdose ? 2.45 : (1.2 + (analysis.bigCarpScore / 80)),
+            charges: groundCharges,
+            maxCharges: groundCharges,
             combos: analysis.detectedCombos
         };
 

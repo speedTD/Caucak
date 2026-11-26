@@ -155,26 +155,26 @@ export const INITIAL_WORLD_MARKET_LISTINGS = [
     {
         id: 'wm_bait_1',
         tab: 'bait',
-        seller: 'Đại Lý Sa Phạm HN',
-        name: 'Combo 5 Gói Cám Chép Phú Thành + 2 Chai Lục Hương',
+        seller: 'Tổng Kho Mồi Đài HN',
+        name: 'Combo 5kg Cám Nền Thơm Tanh + 2 Chai Lục Hương',
         condition: 'Mới 100%',
-        price: 290000,
+        price: 310000,
         icon: '🥣',
         rewardType: 'BAIT_PACK',
-        items: { pt_moi_chep_so_1: 5, sp_luc_huong: 2 },
-        desc: 'Combo giá sỉ Chợ Thế Giới, tiết kiệm hơn mua lẻ ngoài tiệm!'
+        items: { cam_nen_thom_tanh: 5, hl_luc_huong: 2 },
+        desc: 'Combo cám nền 35k/kg kèm Lục Hương giá sỉ Chợ Thế Giới, tiết kiệm hơn mua lẻ ngoài tiệm!'
     },
     {
         id: 'wm_bait_2',
         tab: 'bait',
-        seller: 'Xưởng Ốc Ngâm Đại Yên',
-        name: 'Combo Săn Trắm Đen (4 Gói Ốc Ngâm + 3 Gói Ngô Ủ Men)',
-        condition: 'Ủ Chín Đều',
-        price: 260000,
-        icon: '🐌',
+        seller: 'Xưởng Ốc & Ngô Đại Yên',
+        name: 'Combo Săn Hàng (4kg Ốc Bươu + 10 Bắp Ngô + 1 Rượu Thuốc Bắc)',
+        condition: 'Tươi Tuyển Chọn',
+        price: 265000,
+        icon: '🐚',
         rewardType: 'BAIT_PACK',
-        items: { base_oc_ngam: 4, base_ngo_u_men: 3 },
-        desc: 'Mồi thửa chuyên săn cụ Trắm Đen & Chép Củ rãnh sâu.'
+        items: { oc_buou: 4, ngo_ngot: 10, hl_ruou_thuoc_bac: 1 },
+        desc: 'Combo ốc tươi + ngô ngọt kèm bầu Rượu Thuốc Bắc chuyên ủ săn Trắm Đen & Chép Củ.'
     },
     {
         id: 'wm_line_1',

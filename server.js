@@ -283,6 +283,7 @@ const server = http.createServer(async (req, res) => {
             price: Math.max(1000, Math.round(Number(body.price) || 100000)),
             icon: body.icon || '🎣',
             desc: String(body.desc || '').slice(0, 180),
+            baitItemId: body.baitItemId ? String(body.baitItemId).slice(0, 40) : undefined,
             upgradeSlot: body.upgradeSlot || undefined,
             upgradeLevel: body.upgradeLevel || undefined,
             mainLineSize: body.mainLineSize || undefined,
@@ -338,7 +339,7 @@ const server = http.createServer(async (req, res) => {
             const ext = path.extname(filePath).toLowerCase();
             res.writeHead(200, {
                 'Content-Type': MIME_TYPES[ext] || 'application/octet-stream',
-                'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=3600'
+                'Cache-Control': ext === '.html' ? 'no-cache, no-store, must-revalidate' : 'public, max-age=3600'
             });
             res.end(data);
         });

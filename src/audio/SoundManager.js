@@ -26,6 +26,7 @@ class SoundManager {
         this.isMuted = !this.isMuted;
         if (this.isMuted) {
             this.stopLineSingLoop();
+            this.stopWaterCutLoop();
         }
         if (this.ambientGain && this.ctx) {
             this.ambientGain.gain.setTargetAtTime(this.isMuted ? 0.0 : 0.06, this.ctx.currentTime, 0.05);
@@ -428,6 +429,7 @@ class SoundManager {
     }
 
     stopLineSingLoop() {
+        this.stopWaterCutLoop();
         if (!this.lineSingLoop || !this.ctx) return;
         const loop = this.lineSingLoop;
         this.lineSingLoop = null;
@@ -573,6 +575,119 @@ class SoundManager {
         gain.connect(this.ctx.destination);
         osc.start(now);
         osc.stop(now + 0.05);
+    }
+
+    // ===== TIẾNG CƯỚC XÉ NƯỚC LIÊN TỤC (dây trục cắt ngang mặt hồ khi cá chạy rẽ nước) =====
+    startWaterCutLoop() {
+        if (!this.ctx || this.isMuted || this.waterCutLoop) return;
+        const len = this.ctx.sampleRate * 2;
+        const buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+        const d = buf.getChannelData(0);
+        // Pink-ish noise (lọc bớt tần cao gắt) để nghe như tiếng "xèèè" của nước bị xé
+        let b0 = 0, b1 = 0, b2 = 0;
+        for (let i = 0; i < len; i++) {
+            const w = Math.random() * 2 - 1;
+            b0 = 0.99765 * b0 + w * 0.0990460;
+            b1 = 0.96300 * b1 + w * 0.2965164;
+            b2 = 0.57000 * b2 + w * 1.0526913;
+            d[i] = (b0 + b1 + b2 + w * 0.1848) * 0.18;
+        }
+        const src = this.ctx.createBufferSource();
+        src.buffer = buf;
+        src.loop = true;
+
+        const band = this.ctx.createBiquadFilter();
+        band.type = 'bandpass';
+        band.frequency.value = 1400;
+        band.Q.value = 0.9;
+
+        // Dao động biên độ nhanh tạo cảm giác nước "lách tách" khi vây đuôi cá quẫy
+        const lfo = this.ctx.createOscillator();
+        lfo.frequency.value = 9;
+        const lfoGain = this.ctx.createGain();
+        lfoGain.gain.value = 0.0;
+
+        const gain = this.ctx.createGain();
+        gain.gain.value = 0.0;
+
+        lfo.connect(lfoGain);
+        lfoGain.connect(gain.gain);
+        src.connect(band);
+        band.connect(gain);
+        gain.connect(this.ctx.destination);
+        src.start();
+        lfo.start();
+
+        this.waterCutLoop = { src, band, gain, lfo, lfoGain };
+    }
+
+    // speed: 0..1 tốc độ cá cắt ngang; splashy: 0..1 mức quẫy nước mặt
+    updateWaterCutLoop(speed = 0, splashy = 0) {
+        if (!this.ctx) return;
+        if (this.isMuted) { this.stopWaterCutLoop(); return; }
+        if (!this.waterCutLoop) this.startWaterCutLoop();
+        const L = this.waterCutLoop;
+        if (!L) return;
+        const now = this.ctx.currentTime;
+        const s = Math.max(0, Math.min(1, speed));
+        const vol = 0.012 + s * 0.11 + splashy * 0.05;
+        L.gain.gain.setTargetAtTime(vol, now, 0.08);
+        L.lfoGain.gain.setTargetAtTime(vol * 0.55 * (0.4 + splashy), now, 0.08);
+        L.band.frequency.setTargetAtTime(900 + s * 1800, now, 0.1);
+        L.lfo.frequency.setTargetAtTime(6 + s * 10, now, 0.1);
+    }
+
+    stopWaterCutLoop() {
+        const L = this.waterCutLoop;
+        if (!L || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        L.gain.gain.cancelScheduledValues(now);
+        L.gain.gain.setTargetAtTime(0, now, 0.06);
+        setTimeout(() => {
+            try { L.src.stop(); L.lfo.stop(); } catch (e) { /* đã dừng */ }
+        }, 300);
+        this.waterCutLoop = null;
+    }
+
+    // ===== CÁ LẮC ĐẦU GIẬT CƯỚC: tiếng "phựt" của cước bật + tiếng tạt nước ngắn =====
+    playHeadShake(strength = 1.0) {
+        if (!this.ctx || this.isMuted) return;
+        const now = this.ctx.currentTime;
+        const st = Math.max(0.3, Math.min(1.6, strength));
+
+        // Tiếng cước bật căng (twang): sóng tam giác trượt tần nhanh
+        const osc = this.ctx.createOscillator();
+        const g = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(1500 + Math.random() * 600, now);
+        osc.frequency.exponentialRampToValueAtTime(420, now + 0.12);
+        g.gain.setValueAtTime(0.06 * st, now);
+        g.gain.exponentialRampToValueAtTime(0.0008, now + 0.14);
+        osc.connect(g);
+        g.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.15);
+
+        // Tiếng đuôi cá tạt nước "bạch"
+        const nLen = 0.18;
+        const buf = this.ctx.createBuffer(1, Math.floor(this.ctx.sampleRate * nLen), this.ctx.sampleRate);
+        const d = buf.getChannelData(0);
+        for (let i = 0; i < buf.length; i++) {
+            d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (this.ctx.sampleRate * 0.035));
+        }
+        const n = this.ctx.createBufferSource();
+        n.buffer = buf;
+        const f = this.ctx.createBiquadFilter();
+        f.type = 'bandpass';
+        f.frequency.value = 600 + Math.random() * 400;
+        f.Q.value = 1.4;
+        const ng = this.ctx.createGain();
+        ng.gain.setValueAtTime(0.22 * st, now);
+        ng.gain.exponentialRampToValueAtTime(0.001, now + nLen);
+        n.connect(f);
+        f.connect(ng);
+        ng.connect(this.ctx.destination);
+        n.start(now);
     }
 }
 

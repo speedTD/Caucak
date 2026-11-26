@@ -318,79 +318,114 @@ export function createGrassGroundTexture() {
     return texture;
 }
 
-// 9. Tạo Texture Vân Carbon Xoắn 3K Cho Lóng Cần Câu Đài Cao Cấp
+// 9. Tạo Texture Vân Carbon Xoắn Chéo X-Toray 46T Sắc Nét (Nền sáng trung tính để nhân chuẩn màu Sơn Lóng VertexColors)
 export function createCarbonWeaveTexture() {
-    const canvas = document.createElement('canvas');
-    canvas.width = 128;
-    canvas.height = 128;
-    const ctx = canvas.getContext('2d');
-
-    ctx.fillStyle = '#111827';
-    ctx.fillRect(0, 0, 128, 128);
-
-    for (let y = 0; y < 128; y += 8) {
-        for (let x = 0; x < 128; x += 8) {
-            const isEven = ((x / 8 + y / 8) % 2 === 0);
-            ctx.fillStyle = isEven ? '#1f2937' : '#0f172a';
-            ctx.fillRect(x, y, 7, 7);
-        }
-    }
-
-    ctx.strokeStyle = 'rgba(56, 189, 248, 0.22)';
-    ctx.lineWidth = 3;
-    for (let i = -128; i < 256; i += 32) {
-        ctx.beginPath();
-        ctx.moveTo(0, i);
-        ctx.lineTo(128, i + 64);
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.moveTo(0, i + 64);
-        ctx.lineTo(128, i);
-        ctx.stroke();
-    }
-
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.wrapS = THREE.RepeatWrapping;
-    texture.wrapT = THREE.RepeatWrapping;
-    texture.repeat.set(2, 12);
-    return texture;
-}
-
-// 10. Tạo Texture cuốn cán cần câu cao su vân nổi 3D
-export function createRodGripTexture() {
     const canvas = document.createElement('canvas');
     canvas.width = 256;
     canvas.height = 256;
     const ctx = canvas.getContext('2d');
 
-    ctx.fillStyle = '#171717';
+    ctx.fillStyle = '#bcc6d4';
     ctx.fillRect(0, 0, 256, 256);
 
-    ctx.strokeStyle = '#262626';
-    ctx.lineWidth = 14;
-    for (let i = -256; i < 512; i += 32) {
+    // Đan sợi carbon Twill 2x2 có chiều sâu ánh kim 3D
+    const cell = 8;
+    for (let y = 0; y < 256; y += cell) {
+        for (let x = 0; x < 256; x += cell) {
+            const phase = ((x / cell) + (y / cell)) % 4;
+            const g = ctx.createLinearGradient(x, y, x + cell, y + cell);
+            if (phase < 2) {
+                g.addColorStop(0, '#eef2f6');
+                g.addColorStop(0.5, '#cbd5e1');
+                g.addColorStop(1, '#94a3b8');
+            } else {
+                g.addColorStop(0, '#94a3b8');
+                g.addColorStop(0.5, '#aeb9c7');
+                g.addColorStop(1, '#7c8798');
+            }
+            ctx.fillStyle = g;
+            ctx.fillRect(x, y, cell - 0.5, cell - 0.5);
+        }
+    }
+
+    // Dải gân xoắn X-Power gia cường chịu lực quanh thân lóng cần
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.28)';
+    ctx.lineWidth = 3.5;
+    for (let i = -256; i < 512; i += 48) {
         ctx.beginPath();
         ctx.moveTo(0, i);
         ctx.lineTo(256, i + 128);
         ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(0, i + 128);
+        ctx.lineTo(256, i);
+        ctx.stroke();
     }
 
-    ctx.fillStyle = '#0a0a0a';
-    for (let y = 0; y < 256; y += 8) {
-        for (let x = 0; x < 256; x += 8) {
-            if (Math.random() > 0.4) {
-                ctx.beginPath();
-                ctx.arc(x, y, 1.5, 0, Math.PI * 2);
-                ctx.fill();
-            }
+    // Vệt bóng sơn tĩnh điện chạy dọc ống cần
+    const gloss = ctx.createLinearGradient(0, 0, 256, 0);
+    gloss.addColorStop(0.0, 'rgba(255,255,255,0.0)');
+    gloss.addColorStop(0.32, 'rgba(255,255,255,0.22)');
+    gloss.addColorStop(0.50, 'rgba(255,255,255,0.0)');
+    gloss.addColorStop(0.82, 'rgba(15,23,42,0.16)');
+    gloss.addColorStop(1.0, 'rgba(255,255,255,0.0)');
+    ctx.fillStyle = gloss;
+    ctx.fillRect(0, 0, 256, 256);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(2, 16);
+    return texture;
+}
+
+// 10. Tạo Texture Cuốn Cán Cần Đài Chỉ Dù Xoắn & Màng Co Nhiệt Chống Trượt Cao Cấp
+export function createRodGripTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 512;
+    const ctx = canvas.getContext('2d');
+
+    ctx.fillStyle = '#18181b';
+    ctx.fillRect(0, 0, 256, 512);
+
+    // Các vòng dây mây / chỉ dù quấn khít ở phần tay cầm cổ truyền kết hợp rãnh xoắn EVA chống trượt
+    for (let y = 0; y < 512; y += 6) {
+        const shade = (y % 12 === 0) ? '#27272a' : '#141417';
+        ctx.fillStyle = shade;
+        ctx.fillRect(0, y, 256, 4.5);
+    }
+
+    // Rãnh xoắn chéo kim cương (X-Shrink Tube)
+    ctx.strokeStyle = 'rgba(250, 204, 21, 0.24)';
+    ctx.lineWidth = 2.5;
+    for (let i = -256; i < 768; i += 36) {
+        ctx.beginPath();
+        ctx.moveTo(0, i);
+        ctx.lineTo(256, i + 120);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(0, i + 120);
+        ctx.lineTo(256, i);
+        ctx.stroke();
+    }
+
+    // Hạt nhám cao su chống trơn khi tay ướt nước mồi
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.06)';
+    for (let y = 4; y < 512; y += 8) {
+        for (let x = 4; x < 256; x += 8) {
+            ctx.beginPath();
+            ctx.arc(x, y, 1.2, 0, Math.PI * 2);
+            ctx.fill();
         }
     }
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.wrapS = THREE.RepeatWrapping;
     texture.wrapT = THREE.RepeatWrapping;
-    texture.repeat.set(1, 4);
+    texture.repeat.set(1, 3);
     return texture;
 }
 
@@ -402,71 +437,146 @@ export function createFarShorePanoramaTexture() {
     return texture;
 }
 
-// 11. Tạo Texture Sơn Mài Bóng Cao Cấp Cho Thân Bầu Phao Đài (Phao Bầu Nano / Lông Công Săn Hàng)
-export function createFloatBodyTexture() {
+// 11. Tạo Texture Sơn Mài Bóng Piano Cho Thân Bầu Phao Đài (Hỗ trợ 5 chất liệu thật: Nano / Sa Phạm / Cỏ Sậy / Lông Công / Carbon LED)
+export function createFloatBodyTexture(shape = 'DIAMOND') {
     const canvas = document.createElement('canvas');
-    canvas.width = 256;
-    canvas.height = 512;
+    canvas.width = 512;
+    canvas.height = 1024;
     const ctx = canvas.getContext('2d');
 
-    // Trong Three.js LatheGeometry (flipY = true):
-    // y = 0..130 (Đỉnh vai bầu phao): Sơn cam đỏ phản quang báo điểm chìm bầu phao
-    // y = 130..385 (Bụng bầu phao phình to): Sơn mài Trắng Ngọc Trai / Ngọc Bích có vân lông công
-    // y = 385..512 (Đáy bầu phao thuôn xuống chân): Sơn đen ánh kim & đai chỉ vàng
+    // Bảng màu & chất liệu theo từng dòng phao câu đài thực tế ngoài tiệm đồ câu VN
+    const palettes = {
+        DIAMOND: {
+            shoulderTop: '#ff3b1f', shoulderMid: '#ea580c',
+            bellyTop: '#ffffff', bellyMid: '#f1f5f9', bellyBot: '#cbd5e1',
+            footTop: '#1e293b', footBot: '#09090b',
+            bandMain: '#dc2626', bandGold: '#facc15',
+            brand: 'KIM LONG • NANO', spec: 'QUẢ TRÁM • 2.6G', textCol: '#0f172a', fiber: 'NANO'
+        },
+        TEARDROP: {
+            shoulderTop: '#f97316', shoulderMid: '#0284c7',
+            bellyTop: '#e0f2fe', bellyMid: '#38bdf8', bellyBot: '#0369a1',
+            footTop: '#0c4a6e', footBot: '#09090b',
+            bandMain: '#facc15', bandGold: '#fef08a',
+            brand: 'SA PHẠM • PRO', spec: 'GIỌT NƯỚC • 3.2G', textCol: '#082f49', fiber: 'NANO'
+        },
+        SLIM_REED: {
+            shoulderTop: '#dc2626', shoulderMid: '#b45309',
+            bellyTop: '#fef3c7', bellyMid: '#e7c98a', bellyBot: '#c29b57',
+            footTop: '#78350f', footBot: '#1c1917',
+            bandMain: '#991b1b', bandGold: '#f59e0b',
+            brand: 'LÃO QUỶ • MỘC', spec: 'CỎ SẬY TỰ NHIÊN • 1.8G', textCol: '#451a03', fiber: 'REED'
+        },
+        PEACOCK_LONG: {
+            shoulderTop: '#ef4444', shoulderMid: '#059669',
+            bellyTop: '#ecfdf5', bellyMid: '#10b981', bellyBot: '#065f46',
+            footTop: '#064e3b', footBot: '#09090b',
+            bandMain: '#fde047', bandGold: '#facc15',
+            brand: 'KHỔNG TƯỚC VƯƠNG', spec: 'LÔNG CÔNG ĐẤU GIẢI • 3.8G', textCol: '#022c22', fiber: 'PEACOCK'
+        },
+        SHORT_HEAVY: {
+            shoulderTop: '#00ffaa', shoulderMid: '#0284c7',
+            bellyTop: '#312e81', bellyMid: '#1e1b4b', bellyBot: '#0f172a',
+            footTop: '#09090b', footBot: '#020617',
+            bandMain: '#38bdf8', bandGold: '#facc15',
+            brand: 'HỐ ĐẤU • SMART LED', spec: 'CẢM BIẾN ĐỔI MÀU • 5.5G', textCol: '#e0f2fe', fiber: 'CARBON'
+        }
+    };
+    const p = palettes[shape] || palettes.DIAMOND;
 
-    // 1. Nền gradient toàn thân bầu phao
-    const grad = ctx.createLinearGradient(0, 0, 0, 512);
-    grad.addColorStop(0.0, '#ff2a00');   // Đỉnh vai bầu phao: Đỏ cam dạ quang cực nổi
-    grad.addColorStop(0.20, '#ea580c');  // Vai bầu phao: Cam đậm
-    grad.addColorStop(0.24, '#facc15');  // Viền chuyển tiếp vàng kim
-    grad.addColorStop(0.27, '#f8fafc');  // Thân bầu trên: Trắng ngọc trai
-    grad.addColorStop(0.55, '#f1f5f9');  // Giữa bụng bầu phao: Trắng sứ ánh ngọc
-    grad.addColorStop(0.73, '#0f766e');  // Bụng dưới: Xanh ngọc lục bảo
-    grad.addColorStop(0.78, '#0f172a');  // Đáy bầu phao: Đen carbon
-    grad.addColorStop(1.0, '#09090b');
+    // 1. Nền sơn mài đa tầng từ vai bầu phao (y=0) xuống đáy thuôn chân phao (y=1024)
+    const grad = ctx.createLinearGradient(0, 0, 0, 1024);
+    grad.addColorStop(0.00, p.shoulderTop);
+    grad.addColorStop(0.14, p.shoulderMid);
+    grad.addColorStop(0.18, p.bandGold);
+    grad.addColorStop(0.21, p.bellyTop);
+    grad.addColorStop(0.52, p.bellyMid);
+    grad.addColorStop(0.76, p.bellyBot);
+    grad.addColorStop(0.82, p.footTop);
+    grad.addColorStop(1.00, p.footBot);
     ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, 256, 512);
+    ctx.fillRect(0, 0, 512, 1024);
 
-    // 2. Vân sọc dọc mảnh chất liệu Lông Công / Nano cao cấp trên bụng phao trắng ngọc
-    for (let x = 0; x < 256; x += 6) {
-        ctx.strokeStyle = (x % 12 === 0) ? 'rgba(148, 163, 184, 0.22)' : 'rgba(226, 232, 240, 0.35)';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(x, 136);
-        ctx.lineTo(x, 370);
-        ctx.stroke();
+    // 2. Họa tiết vân chất liệu thật (Thớ cỏ sậy tự nhiên / Sợi ống lông công / Lưới carbon 3K / Bọt Nano mịn)
+    if (p.fiber === 'REED') {
+        for (let x = 0; x < 512; x += 3) {
+            ctx.strokeStyle = (x % 9 === 0) ? 'rgba(120, 53, 15, 0.24)' : 'rgba(254, 243, 199, 0.28)';
+            ctx.lineWidth = 1.4;
+            ctx.beginPath();
+            ctx.moveTo(x, 190);
+            ctx.lineTo(x + (Math.random() - 0.5) * 4, 800);
+            ctx.stroke();
+        }
+        // Đốt sậy tự nhiên nhẹ
+        ctx.fillStyle = 'rgba(120, 53, 15, 0.22)';
+        ctx.fillRect(0, 490, 512, 8);
+    } else if (p.fiber === 'PEACOCK') {
+        for (let x = 0; x < 512; x += 5) {
+            ctx.strokeStyle = (x % 10 === 0) ? 'rgba(6, 78, 59, 0.28)' : 'rgba(255, 255, 255, 0.30)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(x, 185);
+            ctx.lineTo(x, 790);
+            ctx.stroke();
+        }
+    } else if (p.fiber === 'CARBON') {
+        for (let y = 200; y < 800; y += 12) {
+            for (let x = 0; x < 512; x += 12) {
+                ctx.fillStyle = ((x / 12 + y / 12) % 2 === 0) ? 'rgba(56, 189, 248, 0.14)' : 'rgba(15, 23, 42, 0.32)';
+                ctx.fillRect(x, y, 10, 10);
+            }
+        }
+    } else {
+        for (let x = 0; x < 512; x += 8) {
+            ctx.strokeStyle = 'rgba(148, 163, 184, 0.14)';
+            ctx.lineWidth = 1.2;
+            ctx.beginPath();
+            ctx.moveTo(x, 190);
+            ctx.lineTo(x, 780);
+            ctx.stroke();
+        }
     }
 
-    // 3. Các vòng chỉ kim tuyến Vàng Kim & Đỏ Son quấn quanh bầu phao
+    // 3. Các vòng chỉ kim tuyến quấn cổ phao & chân bầu phao sắc sảo (Thay cho vòng Torus thô bị lệch bán kính!)
     const drawBand = (y, h, color) => {
         ctx.fillStyle = color;
-        ctx.fillRect(0, y, 256, h);
+        ctx.fillRect(0, y, 512, h);
     };
+    // Đai cổ vai bầu phao (báo sát mực nước cân phao)
+    drawBand(176, 8, p.bandGold);
+    drawBand(184, 5, '#09090b');
+    drawBand(189, 12, p.bandMain);
+    drawBand(201, 5, '#09090b');
+    drawBand(206, 7, p.bandGold);
 
-    // Đai cổ vai bầu phao (Giúp cần thủ nhìn rõ ranh giới chìm mất bầu phao)
-    drawBand(116, 10, '#facc15');
-    drawBand(126, 5, '#111827');
-    drawBand(131, 6, '#dc2626');
-    drawBand(137, 4, '#facc15');
+    // Đai mảnh trang trí bụng bầu
+    drawBand(480, 4, p.bandGold);
+    drawBand(484, 9, p.bandMain);
+    drawBand(493, 4, p.bandGold);
 
-    // Đai trang trí giữa bụng bầu phao
-    drawBand(240, 4, '#facc15');
-    drawBand(244, 10, '#b91c1c');
-    drawBand(254, 4, '#facc15');
+    // Đai chỉ dù quấn gia cố đáy bầu xuống chân carbon
+    drawBand(778, 7, p.bandGold);
+    drawBand(785, 10, p.bandMain);
+    drawBand(795, 7, p.bandGold);
 
-    // Đai chuyển tiếp đáy bầu phao
-    drawBand(368, 5, '#facc15');
-    drawBand(373, 5, '#dc2626');
-    drawBand(378, 7, '#facc15');
+    // 4. Vệt phản quang dọc như lớp phủ bóng sơn mài 8 lớp
+    const specGrad = ctx.createLinearGradient(0, 0, 512, 0);
+    specGrad.addColorStop(0.0, 'rgba(255,255,255,0.0)');
+    specGrad.addColorStop(0.22, 'rgba(255,255,255,0.34)');
+    specGrad.addColorStop(0.30, 'rgba(255,255,255,0.05)');
+    specGrad.addColorStop(0.75, 'rgba(0,0,0,0.14)');
+    specGrad.addColorStop(1.0, 'rgba(255,255,255,0.0)');
+    ctx.fillStyle = specGrad;
+    ctx.fillRect(0, 0, 512, 1024);
 
-    // 4. Tem chữ thương hiệu in sắc nét trên bầu phao
-    ctx.fillStyle = '#0f172a';
-    ctx.font = 'bold 20px "Segoe UI", sans-serif';
+    // 5. Tem chữ khắc nhũ tinh tế trên bầu phao
+    ctx.fillStyle = p.textCol;
+    ctx.font = 'bold 28px "Segoe UI", sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('KIM LONG • NANO', 128, 195);
-    ctx.fillStyle = '#b91c1c';
-    ctx.font = 'bold 18px "Segoe UI", sans-serif';
-    ctx.fillText('BẦU SĂN HÀNG 3.8G', 128, 222);
+    ctx.fillText(p.brand, 256, 385);
+    ctx.fillStyle = p.bandMain === '#fde047' ? '#fde047' : (p.fiber === 'CARBON' ? '#38bdf8' : '#b91c1c');
+    ctx.font = 'bold 24px "Segoe UI", sans-serif';
+    ctx.fillText(p.spec, 256, 428);
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.needsUpdate = true;

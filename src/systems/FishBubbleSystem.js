@@ -1835,10 +1835,12 @@ export class FishBubbleSystem {
             fish.targetZ = THREE.MathUtils.clamp(fish.targetZ, -this.lakeHalfD + 2.8, this.lakeHalfD - 2.8);
 
             // Sủi tăm bùn tự nhiên trên mặt nước theo tập tính (Tụ 1 ổ sủi dày / Đi ven bờ sủi theo vệt / Ăn chậm sủi rất thưa)
-            // ĐẶC BIỆT: Nếu mồi nặng hương liệu (>= 7 giọt) -> Cá bị kích thích sặc mùi tụ lại CÀY NHIỀU TĂM quanh ổ!
+            // ĐẶC BIỆT: Nếu mồi pha quá tỷ lệ gây nặng mùi (isFlavorOverdose) -> Cá bị kích thích sặc mùi tụ lại CÀY NHIỀU TĂM quanh ổ!
             const bait = this.activeHookTarget && this.activeHookTarget.bait;
             const flavorDrops = bait && typeof bait.totalFlavorDrops === 'number' ? bait.totalFlavorDrops : 0;
-            const isHeavyFlavor = flavorDrops >= 7;
+            const isHeavyFlavor = (bait && typeof bait.isFlavorOverdose === 'boolean')
+                ? bait.isFlavorOverdose
+                : (flavorDrops >= 9);
 
             fish.bubbleCooldown -= delta;
             if (fish.bubbleCooldown <= 0) {

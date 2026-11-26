@@ -4597,28 +4597,965 @@ body, html {
     color: #cbd5e1;
 }
 
-/* ==================== NÚT GHÌ CẦN 1 CHẠM SIÊU DỄ BO CÁ (PC & MOBILE) ==================== */
-.btn-easy-hold-rod {
-    width: 100%;
-    padding: 14px 18px;
-    border-radius: 14px;
-    border: 2px solid #7dd3fc;
-    background: linear-gradient(135deg, #0284c7, #0369a1);
-    color: #ffffff;
-    font-size: 16px;
-    font-weight: 900;
-    letter-spacing: 0.4px;
+/* ==================== THANH VẠCH CÂN BẰNG LỰC BO TRÁI / BO PHẢI & CỤM NÚT ĐẢO CẦN ==================== */
+.fight-hud {
+    width: min(500px, calc(100vw - 24px)) !important;
+}
+
+.balance-gauge-box {
+    margin: 7px 0 9px;
+    padding: 7px 10px 9px;
+    border-radius: 11px;
+    background: rgba(2, 6, 23, 0.76);
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.balance-gauge-box.bal-state-sweet {
+    border-color: rgba(74, 222, 128, 0.72);
+    box-shadow: 0 0 14px rgba(34, 197, 94, 0.22);
+}
+
+.balance-gauge-box.bal-state-warn {
+    border-color: rgba(250, 204, 21, 0.80);
+    box-shadow: 0 0 14px rgba(250, 204, 21, 0.25);
+}
+
+.balance-gauge-box.bal-state-danger {
+    border-color: #ef4444;
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.55);
+    animation: balDangerPulse 0.38s infinite alternate;
+}
+
+@keyframes balDangerPulse {
+    from { transform: scale(1); }
+    to { transform: scale(1.012); }
+}
+
+.balance-gauge-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+
+.bal-side-lbl {
+    font-size: 10.5px;
+    font-weight: 800;
+    color: #94a3b8;
+    white-space: nowrap;
+}
+
+.bal-status-text {
+    font-size: 11.5px;
+    font-weight: 800;
+    color: #fef08a;
+    text-align: center;
+    flex: 1;
+}
+
+.bal-state-sweet .bal-status-text { color: #86efac; }
+.bal-state-danger .bal-status-text { color: #fca5a5; }
+
+.balance-track {
+    position: relative;
+    height: 16px;
+    border-radius: 999px;
+    background: linear-gradient(
+        90deg,
+        rgba(239, 68, 68, 0.88) 0%,
+        rgba(245, 158, 11, 0.82) 22%,
+        rgba(34, 197, 94, 0.32) 34%,
+        rgba(34, 197, 94, 0.45) 50%,
+        rgba(34, 197, 94, 0.32) 66%,
+        rgba(245, 158, 11, 0.82) 78%,
+        rgba(239, 68, 68, 0.88) 100%
+    );
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    overflow: visible;
+}
+
+.balance-zone-sweet {
+    position: absolute;
+    top: 1px;
+    bottom: 1px;
+    left: 33.5%;
+    width: 33%;
+    border-radius: 999px;
+    background: rgba(34, 197, 94, 0.38);
+    border: 1px solid rgba(134, 239, 172, 0.85);
+    pointer-events: none;
+}
+
+.balance-center-tick {
+    position: absolute;
+    top: -2px;
+    bottom: -2px;
+    left: 50%;
+    width: 2px;
+    transform: translateX(-50%);
+    background: #ffffff;
+    box-shadow: 0 0 6px #ffffff;
+    pointer-events: none;
+}
+
+.balance-fish-vector {
+    position: absolute;
+    top: 5px;
+    height: 4px;
+    left: 50%;
+    width: 0%;
+    background: rgba(56, 189, 248, 0.72);
+    border-radius: 999px;
+    pointer-events: none;
+    transition: left 0.08s linear, width 0.08s linear;
+}
+
+.balance-needle {
+    position: absolute;
+    top: -4px;
+    width: 12px;
+    height: 22px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-radius: 5px;
+    background: #f8fafc;
+    border: 2px solid #16a34a;
+    box-shadow: 0 0 12px rgba(74, 222, 128, 0.95);
+    pointer-events: none;
+    transition: left 0.05s linear;
+}
+
+.bal-state-warn .balance-needle {
+    border-color: #f59e0b;
+    box-shadow: 0 0 12px rgba(250, 204, 21, 0.95);
+}
+
+.bal-state-danger .balance-needle {
+    background: #fee2e2;
+    border-color: #dc2626;
+    box-shadow: 0 0 16px rgba(239, 68, 68, 1);
+}
+
+.fight-steer-row {
+    display: grid;
+    grid-template-columns: 1fr 1.25fr 1fr;
+    gap: 7px;
+    margin-bottom: 7px;
+}
+
+.btn-steer-rod {
+    padding: 11px 8px;
+    border-radius: 11px;
+    border: 1.5px solid rgba(148, 163, 184, 0.45);
+    background: linear-gradient(135deg, rgba(30, 41, 59, 0.92), rgba(15, 23, 42, 0.95));
+    color: #e2e8f0;
+    font-size: 12px;
+    font-weight: 800;
     cursor: pointer;
-    box-shadow: 0 8px 24px rgba(2, 132, 199, 0.55);
     user-select: none;
     -webkit-user-select: none;
     touch-action: none;
-    transition: transform 0.1s ease, background 0.15s ease;
+    transition: all 0.14s ease;
 }
 
+.btn-easy-hold-rod {
+    width: 100%;
+    padding: 11px 10px;
+    border-radius: 11px;
+    border: 2px solid #7dd3fc;
+    background: linear-gradient(135deg, #0284c7, #0369a1);
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 900;
+    letter-spacing: 0.3px;
+    cursor: pointer;
+    box-shadow: 0 6px 18px rgba(2, 132, 199, 0.45);
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+    transition: all 0.14s ease;
+}
+
+.btn-steer-rod.required-key,
+.btn-easy-hold-rod.required-key {
+    border-color: #fde047 !important;
+    box-shadow: 0 0 16px rgba(250, 204, 21, 0.78) !important;
+    animation: steerNeedPulse 0.48s infinite alternate;
+}
+
+@keyframes steerNeedPulse {
+    from { filter: brightness(1); transform: translateY(0); }
+    to { filter: brightness(1.22); transform: translateY(-1px); }
+}
+
+.btn-steer-rod.pressed-key,
+.btn-steer-rod:active,
+.btn-easy-hold-rod.pressed-key,
 .btn-easy-hold-rod:active {
-    transform: scale(0.97);
-    background: linear-gradient(135deg, #16a34a, #15803d);
-    border-color: #86efac;
-    box-shadow: 0 0 22px rgba(34, 197, 94, 0.65);
+    transform: scale(0.96);
+    background: linear-gradient(135deg, #16a34a, #15803d) !important;
+    border-color: #86efac !important;
+    color: #ffffff !important;
+    box-shadow: 0 0 18px rgba(34, 197, 94, 0.68) !important;
+}
+
+/* ==================== KHUNG MÔ HÌNH ĐỒ HỌA TRANG BỊ • PHAO • TRỤC • BỂ CÂN NƯỚC ==================== */
+.upg-model-showcase {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin: 8px 0 10px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: radial-gradient(circle at center, rgba(14, 116, 144, 0.24), rgba(2, 6, 23, 0.65));
+    border: 1px solid rgba(56, 189, 248, 0.24);
+    min-height: 86px;
+}
+
+.upg-model-cur,
+.upg-model-next {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    flex: 1;
+}
+
+.upg-model-next {
+    opacity: 0.88;
+}
+
+.upg-model-arrow {
+    color: #fde047;
+    font-size: 16px;
+    font-weight: 900;
+}
+
+.upg-model-tag {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: rgba(16, 185, 129, 0.22);
+    color: #6ee7b7;
+}
+
+.upg-model-tag.next {
+    background: rgba(250, 204, 21, 0.22);
+    color: #fde047;
+}
+
+.rig-rod-svg-wrap {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 4px 6px;
+    margin-bottom: 5px;
+    border-radius: 8px;
+    background: rgba(2, 6, 23, 0.55);
+    border: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.rig-calib-showcase {
+    display: grid;
+    grid-template-columns: 1.35fr 1fr;
+    gap: 12px;
+    align-items: stretch;
+}
+
+.rig-water-tank-box {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.rig-line-card-top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.rig-spool-visual {
+    flex-shrink: 0;
+    padding: 4px;
+    border-radius: 10px;
+    background: rgba(2, 6, 23, 0.5);
+    border: 1px solid rgba(148, 163, 184, 0.22);
+}
+
+.shop-svg-icon {
+    width: 72px !important;
+    min-width: 72px;
+    height: 84px !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at center, rgba(30, 58, 138, 0.35), rgba(2, 6, 23, 0.72));
+    border-radius: 10px;
+    border: 1px solid rgba(56, 189, 248, 0.28);
+    padding: 4px;
+}
+
+@media (max-width: 720px) {
+    .rig-calib-showcase {
+        grid-template-columns: 1fr;
+    }
+    .fight-steer-row {
+        gap: 5px;
+    }
+    .btn-steer-rod,
+    .btn-easy-hold-rod {
+        font-size: 11px;
+        padding: 9px 6px;
+    }
+}
+
+
+/* ==================== CHẬU PHA MỒI 3 LOẠI CÂU (CÂU CÁM • CÂU ỐC • CÂU NGÔ) ==================== */
+.mix-mode-selector-bar {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    padding: 8px 16px 4px;
+}
+
+.mix-mode-tab {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border-radius: 12px;
+    background: rgba(15, 23, 42, 0.85);
+    border: 1.5px solid rgba(148, 163, 184, 0.25);
+    color: #cbd5e1;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.18s ease;
+}
+
+.mix-mode-tab:hover {
+    border-color: #38bdf8;
+    background: rgba(14, 116, 144, 0.25);
+}
+
+.mix-mode-tab.active {
+    background: linear-gradient(135deg, rgba(2, 132, 199, 0.42), rgba(5, 150, 105, 0.35));
+    border-color: #38bdf8;
+    box-shadow: 0 0 16px rgba(56, 189, 248, 0.35);
+    color: #ffffff;
+}
+
+.mix-mode-tab .mm-ico {
+    font-size: 23px;
+    flex-shrink: 0;
+}
+
+.mix-mode-tab .mm-txt {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.mix-mode-tab .mm-txt b {
+    font-size: 13px;
+    color: #fef08a;
+}
+
+.mix-mode-tab .mm-txt small {
+    font-size: 10.5px;
+    color: #cbd5e1;
+    line-height: 1.25;
+}
+
+.basin-live-card {
+    background: radial-gradient(circle at 50% 45%, rgba(14, 116, 144, 0.28), rgba(2, 6, 23, 0.82));
+    border: 1px solid rgba(56, 189, 248, 0.38);
+    border-radius: 12px;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+}
+
+.basin-card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    font-size: 11.5px;
+    color: #e0f2fe;
+    margin-bottom: 4px;
+}
+
+.btn-clear-basin {
+    flex-shrink: 0;
+    background: rgba(239, 68, 68, 0.18);
+    border: 1px solid rgba(248, 113, 113, 0.45);
+    color: #fecaca;
+    border-radius: 7px;
+    padding: 4px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.btn-clear-basin:hover {
+    background: rgba(239, 68, 68, 0.38);
+    color: #fff;
+}
+
+.basin-svg-stage {
+    max-width: 280px;
+    margin: 0 auto;
+}
+
+.basin-chips-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 4px;
+    min-height: 24px;
+}
+
+.basin-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.12s;
+}
+
+.basin-chip:hover {
+    transform: scale(1.04);
+}
+
+.basin-chip.chip-base {
+    background: rgba(217, 119, 6, 0.26);
+    border: 1px solid rgba(251, 191, 36, 0.55);
+    color: #fef08a;
+}
+
+.basin-chip.chip-flavor {
+    background: rgba(16, 185, 129, 0.24);
+    border: 1px solid rgba(52, 211, 153, 0.55);
+    color: #a7f3d0;
+}
+
+.basin-chip.chip-overdose {
+    background: rgba(220, 38, 38, 0.35);
+    border-color: #f87171;
+    color: #fecaca;
+}
+
+.basin-empty-note {
+    font-size: 11px;
+    color: #94a3b8;
+    font-style: italic;
+}
+
+#base-bait-list.base-select-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.basin-ing-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 9px;
+    border-radius: 10px;
+    background: rgba(15, 23, 42, 0.78);
+    border: 1px solid rgba(148, 163, 184, 0.22);
+}
+
+.basin-ing-row.in-basin {
+    background: rgba(14, 116, 144, 0.28);
+    border-color: #38bdf8;
+}
+
+.basin-ing-row.mode-dim {
+    opacity: 0.78;
+}
+
+.ing-row-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.ing-ico {
+    font-size: 20px;
+}
+
+.ing-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    font-size: 12.5px;
+    color: #f8fafc;
+}
+
+.ing-price-tag {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #fde047;
+    background: rgba(234, 179, 8, 0.16);
+    padding: 1px 6px;
+    border-radius: 6px;
+}
+
+.ing-stock {
+    font-size: 11px;
+    color: #94a3b8;
+    margin-top: 1px;
+}
+
+.ing-row-controls {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.btn-ing-step {
+    background: #1e293b;
+    border: 1px solid rgba(56, 189, 248, 0.4);
+    color: #e0f2fe;
+    border-radius: 7px;
+    padding: 4px 7px;
+    font-size: 11px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.btn-ing-step:hover:not(:disabled) {
+    background: #0284c7;
+    color: #fff;
+}
+
+.btn-ing-step:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.ing-basin-val {
+    min-width: 44px;
+    text-align: center;
+    font-size: 11.5px;
+    color: #fef08a;
+}
+
+.flavor-row.flavor-recommended {
+    border: 1px solid rgba(52, 211, 153, 0.48);
+    background: rgba(6, 78, 59, 0.25);
+}
+
+.flavor-row.in-basin {
+    border-color: #38bdf8;
+    background: rgba(2, 132, 199, 0.24);
+}
+
+.flv-rec-badge {
+    display: inline-block;
+    margin-left: 4px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: rgba(16, 185, 129, 0.28);
+    color: #6ee7b7;
+    font-size: 10px;
+    font-weight: 800;
+}
+
+.flv-best-note {
+    display: block;
+    color: #94a3b8;
+    font-size: 10.5px;
+    margin-top: 2px;
+}
+
+.water-rule-banner.overdose-alert {
+    background: linear-gradient(135deg, rgba(185, 28, 28, 0.88), rgba(127, 29, 29, 0.92)) !important;
+    border: 1px solid #f87171 !important;
+    color: #ffffff !important;
+    font-weight: 900 !important;
+}
+
+.water-rule-banner.optimal-alert {
+    background: linear-gradient(135deg, rgba(5, 150, 105, 0.85), rgba(6, 95, 70, 0.92)) !important;
+    border: 1px solid #34d399 !important;
+    color: #ffffff !important;
+    font-weight: 900 !important;
+}
+
+@media (max-width: 820px) {
+    .mix-mode-selector-bar {
+        grid-template-columns: 1fr;
+    }
+    .basin-ing-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .ing-row-controls {
+        justify-content: flex-end;
+    }
+}
+
+
+/* ==================== CHẾ ĐỘ BO CÁ MÀN HÌNH SẠCH & NÚT HÌNH TRÒN 360° GẦN GIỮA MÀN HÌNH ==================== */
+/* Đẩy thông báo ngắn lên trên bảng ngồi bến để không bao giờ đè lên nút Vung Cần / 4 Bước */
+.action-prompt-box {
+    bottom: 166px !important;
+    pointer-events: none !important;
+    z-index: 18;
+}
+
+/* Khi đang Bo Cá (FIGHTING): Ẩn sạch toàn bộ các bảng & nút khác để nhìn cá chạy rẽ nước cực thoáng! */
+#game-ui-root.fighting-clean-view .top-hud,
+#game-ui-root.fighting-clean-view .radar-box,
+#game-ui-root.fighting-clean-view #seated-controls,
+#game-ui-root.fighting-clean-view #action-prompt,
+#game-ui-root.fighting-clean-view #mobile-controls,
+#game-ui-root.fighting-clean-view #strike-container,
+#game-ui-root.fighting-clean-view #fish-mind-hud,
+#game-ui-root.fighting-clean-view #online-room-panel,
+#game-ui-root.fighting-clean-view #right-controls-panel,
+#game-ui-root.fighting-clean-view #pip-float-frame,
+#game-ui-root.fighting-clean-view #spot-near-banner {
+    display: none !important;
+}
+
+/* Bỏ nền hộp chữ nhật cũ của #fight-hud, chuyển thành lớp phủ trong suốt hoàn toàn */
+#fight-hud.fight-hud {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    max-width: none !important;
+    bottom: auto !important;
+    left: 0 !important;
+    transform: none !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    padding: 0 !important;
+    pointer-events: none !important;
+    z-index: 45;
+}
+
+/* Dải thông tin cân bằng lực & căng cước mỏng gọn ở sát mép trên (không che mặt nước ở giữa) */
+.fight-top-hud-card {
+    position: fixed;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(440px, 92vw);
+    background: rgba(9, 18, 32, 0.56);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(56, 189, 248, 0.32);
+    border-radius: 14px;
+    padding: 7px 12px 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    pointer-events: none;
+}
+
+/* Cụm NÚT HÌNH TRÒN GHÌ & BO CÁ đặt GẦN GIỮA MÀN HÌNH */
+.fight-circle-zone {
+    position: fixed;
+    top: 60%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    pointer-events: none;
+}
+
+.fight-circle-pad {
+    position: relative;
+    width: 178px;
+    height: 178px;
+    border-radius: 50%;
+    background: radial-gradient(
+        circle at center,
+        rgba(14, 116, 144, 0.12) 0%,
+        rgba(15, 23, 42, 0.36) 62%,
+        rgba(2, 6, 23, 0.62) 100%
+    );
+    border: 2px solid rgba(56, 189, 248, 0.55);
+    box-shadow:
+        0 0 26px rgba(2, 132, 199, 0.28),
+        inset 0 0 18px rgba(56, 189, 248, 0.16);
+    backdrop-filter: blur(3px);
+    pointer-events: auto;
+    touch-action: none;
+    cursor: grab;
+    user-select: none;
+    -webkit-user-select: none;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.fight-circle-pad:active {
+    cursor: grabbing;
+}
+
+.fight-circle-pad.pad-danger-tension {
+    border-color: rgba(248, 113, 113, 0.88);
+    box-shadow:
+        0 0 28px rgba(239, 68, 68, 0.45),
+        inset 0 0 20px rgba(239, 68, 68, 0.22);
+}
+
+.fc-crosshair-h,
+.fc-crosshair-v {
+    position: absolute;
+    background: rgba(148, 163, 184, 0.18);
+    pointer-events: none;
+}
+
+.fc-crosshair-h {
+    top: 50%;
+    left: 14px;
+    right: 14px;
+    height: 1px;
+    transform: translateY(-50%);
+}
+
+.fc-crosshair-v {
+    left: 50%;
+    top: 14px;
+    bottom: 14px;
+    width: 1px;
+    transform: translateX(-50%);
+}
+
+.fc-inner-ring {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 108px;
+    height: 108px;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    border: 1px dashed rgba(125, 211, 252, 0.34);
+    pointer-events: none;
+}
+
+/* 4 hướng Lên / Xuống / Trái / Phải trên vành nút tròn */
+.fc-sector {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 10.5px;
+    font-weight: 900;
+    color: rgba(226, 232, 240, 0.88);
+    background: rgba(15, 23, 42, 0.48);
+    border: 1px solid rgba(148, 163, 184, 0.26);
+    pointer-events: none;
+    transition: all 0.12s ease;
+    white-space: nowrap;
+}
+
+.fc-sector .fc-arr {
+    font-size: 11px;
+    color: #7dd3fc;
+}
+
+.fc-up {
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    flex-direction: column;
+    gap: 0px;
+    padding: 3px 10px;
+}
+
+.fc-down {
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    flex-direction: column;
+    gap: 0px;
+    padding: 3px 10px;
+}
+
+.fc-left {
+    left: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.fc-right {
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+/* Nhấp nháy vàng dẫn hướng khi người chơi cần kéo về phía đó */
+.fc-sector.required-key {
+    background: rgba(234, 179, 8, 0.36);
+    border-color: #fde047;
+    color: #fef9c3;
+    box-shadow: 0 0 14px rgba(250, 204, 21, 0.85);
+    animation: fcPulseHint 0.46s infinite alternate;
+}
+.fc-sector.required-key .fc-arr {
+    color: #fde047;
+}
+
+/* Sáng xanh ngọc khi đang kéo đúng về hướng đó */
+.fc-sector.pressed-key {
+    background: rgba(22, 163, 74, 0.78) !important;
+    border-color: #86efac !important;
+    color: #ffffff !important;
+    box-shadow: 0 0 16px rgba(34, 197, 94, 0.85) !important;
+}
+.fc-sector.pressed-key .fc-arr {
+    color: #ffffff !important;
+}
+
+@keyframes fcPulseHint {
+    from { filter: brightness(1); }
+    to { filter: brightness(1.3); }
+}
+
+/* Núm tròn trung tâm kéo mượt 360 độ */
+.fc-knob {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 68px;
+    height: 68px;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #38bdf8, #0284c7 62%, #0f172a 100%);
+    border: 2.5px solid #bae6fd;
+    box-shadow:
+        0 6px 18px rgba(0, 0, 0, 0.55),
+        0 0 16px rgba(56, 189, 248, 0.65);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    pointer-events: none;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.fc-knob.knob-active {
+    background: radial-gradient(circle at 35% 30%, #4ade80, #16a34a 64%, #064e3b 100%);
+    border-color: #bbf7d0;
+    box-shadow:
+        0 6px 18px rgba(0, 0, 0, 0.55),
+        0 0 22px rgba(74, 222, 128, 0.85);
+}
+
+.fc-knob.knob-net-ready {
+    background: radial-gradient(circle at 35% 30%, #fde047, #f59e0b 65%, #78350f 100%);
+    border-color: #fef9c3;
+    box-shadow: 0 0 24px rgba(250, 204, 21, 0.95);
+    pointer-events: auto;
+    cursor: pointer;
+}
+
+.fc-knob-ico {
+    font-size: 17px;
+    line-height: 1;
+}
+
+.fc-knob-txt {
+    font-size: 9.5px;
+    font-weight: 900;
+    color: #ffffff;
+    letter-spacing: 0.3px;
+}
+
+/* Nút Hớt Cá hiện ra ngay dưới vòng tròn khi cá đã nổi ngửa bụng 100% */
+.btn-net-fish-round {
+    pointer-events: auto;
+    padding: 9px 18px;
+    border-radius: 999px;
+    border: 2px solid #fef08a;
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 900;
+    cursor: pointer;
+    box-shadow: 0 0 22px rgba(16, 185, 129, 0.85);
+}
+
+/* 3 nút chiêu thức tròn nhỏ gọn ôm dưới vòng tròn */
+.fight-mini-skills-arc {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    pointer-events: auto;
+}
+
+.btn-mini-skill {
+    min-width: 52px;
+    height: 32px;
+    padding: 0 10px;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.68);
+    border: 1.5px solid rgba(56, 189, 248, 0.45);
+    color: #e0f2fe;
+    font-size: 11.5px;
+    font-weight: 800;
+    cursor: pointer;
+    backdrop-filter: blur(4px);
+    transition: all 0.15s ease;
+}
+
+.btn-mini-skill:hover:not(:disabled) {
+    background: rgba(2, 132, 199, 0.75);
+    border-color: #7dd3fc;
+    transform: translateY(-1px);
+}
+
+.btn-mini-skill:disabled {
+    opacity: 0.42;
+    cursor: default;
+}
+
+.btn-mini-skill.btn-mini-leash {
+    background: rgba(217, 119, 6, 0.72);
+    border-color: #fde047;
+    color: #fef9c3;
+}
+
+.btn-mini-skill.skill-recommended {
+    border-color: #fde047;
+    box-shadow: 0 0 12px rgba(250, 204, 21, 0.8);
+}
+
+@media (max-width: 720px) {
+    .fight-circle-zone {
+        top: 62%;
+    }
+    .fight-circle-pad {
+        width: 158px;
+        height: 158px;
+    }
+    .fc-knob {
+        width: 60px;
+        height: 60px;
+    }
 }
