@@ -187,6 +187,22 @@ export class FishingGameplay {
         this.singSoundCooldown = 0;
         this.wakeSplashCooldown = 0;
 
+        // Hệ thống KÍCH MỒI (Nhấc nhử đọt cần): Mỗi ca 5 tiếng có 5-15 lần hiệu quả random, 30% cá ăn sau 5s (Bấm 2-3 vạch giữ 3-5s)
+        this.twitchEffectiveLeft = 0;
+        this.twitchEffectiveMax = 0;
+        this.twitchBiteCountdown = 0;
+        this.twitchBubbleHintSpawned = false;
+        this.twitchRodAnimTimer = 0;
+        this.twitchCooldownTimer = 0;
+
+        // Hệ thống PHAO ĐÊM ĐIỆN TỬ OLED (Tự động bật phát sáng quang học từ 18:00 tối trở đi)
+        this.isNightOledActive = false;
+        this.floatOledSheathMats = [];
+        this.floatOledNightColors = [];
+        this.floatOledCollarGlow = null;
+        this.floatNightWaterGlow = null;
+        this.floatNightPointLight = null;
+
         // Hệ thống cấp độ 7 trang bị câu đài & Bộ Set Trục/Thẻo/Cân Phao/Cần khởi đầu
         this.equipmentLevels = getDefaultEquipmentLevels();
         this.equipBonuses = computeEquipmentBonuses(this.equipmentLevels);
@@ -195,6 +211,8 @@ export class FishingGameplay {
         this.activeMainLineSpec = getLineSpec(this.rigConfig.mainLineSize);
         this.activeLeaderSpec = getLineSpec(this.rigConfig.leaderSize);
         this.activeCalibration = getCalibrationById(this.rigConfig.calibrationId);
+
+        this.resetTwitchShiftQuota(5);
 
         this.initFPVViewmodel();
         this.initFloatModel();
@@ -1060,6 +1078,12 @@ export class FishingGameplay {
         if (this.strikeWhipTimer > 0) {
             this.strikeWhipTimer = Math.max(0, this.strikeWhipTimer - delta);
         }
+        if (this.twitchRodAnimTimer > 0) {
+            this.twitchRodAnimTimer = Math.max(0, this.twitchRodAnimTimer - delta);
+        }
+        if (this.twitchCooldownTimer > 0) {
+            this.twitchCooldownTimer = Math.max(0, this.twitchCooldownTimer - delta);
+        }
         if (this.headShakeImpulse > 0) {
             this.headShakeImpulse = Math.max(0, this.headShakeImpulse - delta * 2.6);
         }
@@ -1083,6 +1107,13 @@ export class FishingGameplay {
             targetPitch = -74 + snapArc * 38;
             targetYaw = 6;
             targetBendDown = p < 0.32 ? -0.22 * Math.sin((p / 0.32) * Math.PI) : 0.14 * (1 - p);
+        } else if (this.twitchRodAnimTimer > 0 && this.state === FISHING_STATES.FLOAT_WAIT) {
+            // ĐỘNG TÁC KÍCH MỒI: Nhấc nhử nhẹ đọt cần lên ~8 độ rồi hạ êm ái xuống gác chữ V
+            const pTw = 1.0 - (this.twitchRodAnimTimer / 0.68);
+            const liftArc = Math.sin(pTw * Math.PI);
+            targetPitch = -74 + liftArc * 8.5;
+            targetYaw = 6;
+            targetBendDown = 0.02 + liftArc * 0.06;
         } else if (this.state === FISHING_STATES.BITING && this.biteType === BITE_TYPES.ROD_PULL) {
             targetPitch = -79;
             targetBendDown = 0.42;
@@ -1513,7 +1544,7 @@ export class FishingGameplay {
             ledBiteColor: false
         });
 
-        // 5. VÒNG SỨC CĂNG BỀ MẶT NƯỚC MẢNH TINH TẾ (Nằm phẳng trên mặt nước Y = 0.004)
+        // 5. VÒNG SỨC CĂNG BỀ MẶT NƯỚC MẢNH TINH TẾ + QUẦNG PHẢN QUANG PHAO ĐÊM OLED (Nằm phẳng trên mặt nước)
         this.floatMeniscusRing = new THREE.Mesh(
             new THREE.RingGeometry(0.0035, 0.026, 32),
             new THREE.MeshBasicMaterial({
@@ -1527,6 +1558,54 @@ export class FishingGameplay {
         this.floatMeniscusRing.position.y = 0.004;
         this.floatMeniscusRing.visible = false;
         this.scene.add(this.floatMeniscusRing);
+
+        // Vòng ren pin Lithium phát quang xanh băng ở đỉnh cổ bầu phao điện OLED
+        this.floatOledCollarGlow = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.0052, 0.0058, 0.010, 20),
+            this.applyFloatWaterlineShader(new THREE.MeshBasicMaterial({
+                color: 0x00ffd5,
+                transparent: true,
+                opacity: 0.0
+            }))
+        );
+        this.floatOledCollarGlow.position.y = 0.001;
+        this.floatGroup.add(this.floatOledCollarGlow);
+
+        // Quầng phản chiếu ánh đèn Phao Đêm OLED lung linh trên mặt nước quanh chân tăm (chỉ sáng từ 18:00 tối!)
+        const glowCanvas = document.createElement('canvas');
+        glowCanvas.width = 128;
+        glowCanvas.height = 128;
+        const gctx = glowCanvas.getContext('2d');
+        const radG = gctx.createRadialGradient(64, 64, 2, 64, 64, 62);
+        radG.addColorStop(0.0, 'rgba(0, 255, 213, 0.92)');
+        radG.addColorStop(0.32, 'rgba(0, 225, 255, 0.42)');
+        radG.addColorStop(0.7, 'rgba(16, 185, 129, 0.12)');
+        radG.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+        gctx.fillStyle = radG;
+        gctx.fillRect(0, 0, 128, 128);
+        const waterGlowTex = new THREE.CanvasTexture(glowCanvas);
+
+        this.floatNightWaterGlowMat = new THREE.MeshBasicMaterial({
+            map: waterGlowTex,
+            color: 0x00ffd5,
+            transparent: true,
+            opacity: 0.85,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            side: THREE.DoubleSide
+        });
+        this.floatNightWaterGlow = new THREE.Mesh(
+            new THREE.PlaneGeometry(0.26, 0.26),
+            this.floatNightWaterGlowMat
+        );
+        this.floatNightWaterGlow.rotation.x = -Math.PI / 2;
+        this.floatNightWaterGlow.position.y = 0.0055;
+        this.floatNightWaterGlow.visible = false;
+        this.scene.add(this.floatNightWaterGlow);
+
+        this.floatNightPointLight = new THREE.PointLight(0x00ffd5, 0, 2.6, 1.8);
+        this.floatNightPointLight.position.set(0, 0.16, 0);
+        this.floatGroup.add(this.floatNightPointLight);
 
         this.scene.add(this.floatGroup);
     }
@@ -1787,6 +1866,8 @@ export class FishingGameplay {
             const markH = 0.352 / count;
             this.floatTipMats = [];
             this.floatOriginalTipColors = [];
+            this.floatOledSheathMats = [];
+            this.floatOledNightColors = [];
 
             for (let i = 0; i < count; i++) {
                 const isTopEye = (i >= count - 2);
@@ -1802,9 +1883,16 @@ export class FishingGameplay {
                     if (i === count - 1) markColor = 0xff2a00;
                 }
 
+                // Bảng màu Phao Đêm OLED siêu tương phản khi câu tối từ 18:00 trở đi (Ngọn Cam Đỏ Neon • Thân Xanh Ngọc OLED / Vàng Chanh Quang Học)
+                let oledNightHex = 0x00ffd5;
+                if (i >= count - 2) oledNightHex = 0xff2a55;
+                else if (i % 2 === 1) oledNightHex = 0xffee00;
+
                 const segMat = this.applyFloatWaterlineShader(new THREE.MeshBasicMaterial({ color: markColor }));
                 this.floatTipMats.push(segMat);
                 this.floatOriginalTipColors.push(markColor);
+                this.floatOledNightColors.push(oledNightHex);
+
                 const seg = new THREE.Mesh(
                     new THREE.CylinderGeometry(radius * 0.97, radius, markH * 0.84, 16),
                     segMat
@@ -1813,6 +1901,22 @@ export class FishingGameplay {
                 seg.position.y = yPos;
                 this.floatTipsGroup.add(seg);
 
+                // Lớp vỏ hào quang OLED phát sáng rực rỡ bọc ngoài mỗi vạch tăm phao vào ban đêm (Additive Glow)
+                const sheathMat = this.applyFloatWaterlineShader(new THREE.MeshBasicMaterial({
+                    color: oledNightHex,
+                    transparent: true,
+                    opacity: 0.0,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false
+                }));
+                this.floatOledSheathMats.push(sheathMat);
+                const oledSheath = new THREE.Mesh(
+                    new THREE.CylinderGeometry(radius * 2.15, radius * 2.25, markH * 0.90, 14),
+                    sheathMat
+                );
+                oledSheath.position.y = yPos;
+                this.floatTipsGroup.add(oledSheath);
+
                 const spacer = new THREE.Mesh(
                     new THREE.CylinderGeometry(radius * 0.90, radius * 0.90, markH * 0.16, 14),
                     this.floatBlackSpacerMat
@@ -1820,7 +1924,7 @@ export class FishingGameplay {
                 spacer.position.y = yPos - markH * 0.5;
                 this.floatTipsGroup.add(spacer);
 
-                // Đỉnh chóp tăm phao bo tròn chống lóa mắt ngoài nắng
+                // Đỉnh chóp tăm phao bo tròn chống lóa mắt ngoài nắng + bọc hào quang OLED đêm
                 if (i === count - 1) {
                     const topDome = new THREE.Mesh(
                         new THREE.SphereGeometry(radius * 1.02, 14, 10),
@@ -1828,19 +1932,77 @@ export class FishingGameplay {
                     );
                     topDome.position.y = yPos + markH * 0.42;
                     this.floatTipsGroup.add(topDome);
+
+                    const topGlowDome = new THREE.Mesh(
+                        new THREE.SphereGeometry(radius * 2.35, 12, 10),
+                        sheathMat
+                    );
+                    topGlowDome.position.y = yPos + markH * 0.42;
+                    this.floatTipsGroup.add(topGlowDome);
                 }
             }
         }
     }
 
+    // Kiểm tra có đang trong khung giờ Câu Đêm từ 18:00 (6h tối) trở đi hay không
+    isNightFloatTime() {
+        const rawH = (this.environment && typeof this.environment.currentHour === 'number')
+            ? this.environment.currentHour
+            : 9.0;
+        const h24 = ((rawH % 24) + 24) % 24;
+        return (h24 >= 18.0 || h24 < 5.8);
+    }
+
     updateFloatLedGlow(isBiteTake = false) {
         if (!this.floatTipMats || !this.floatOriginalTipColors) return;
-        const useLed = this.equipBonuses && this.equipBonuses.ledBiteColor;
+        const nightOled = this.isNightFloatTime();
+        this.isNightOledActive = nightOled;
+        const useDayLed = this.equipBonuses && this.equipBonuses.ledBiteColor;
+        const pulse = 0.88 + Math.sin(performance.now() * 0.008) * 0.12;
+
         for (let i = 0; i < this.floatTipMats.length; i++) {
-            if (useLed && isBiteTake) {
-                this.floatTipMats[i].color.setHex(0xff1100); // Đỏ rực phát quang khi cá cắn đúng nhịp!
+            if (nightOled) {
+                // PHAO ĐÊM OLED PHÁT SÁNG TỪ 18:00 TỐI: Đổi đỏ hồng cảm biến trọng lực khi cá ăn vào nhịp đóng!
+                const cHex = isBiteTake ? 0xff1744 : (this.floatOledNightColors[i] || 0x00ffd5);
+                this.floatTipMats[i].color.setHex(cHex);
+                if (this.floatOledSheathMats && this.floatOledSheathMats[i]) {
+                    this.floatOledSheathMats[i].color.setHex(cHex);
+                    this.floatOledSheathMats[i].opacity = (isBiteTake ? 0.62 : 0.44) * pulse;
+                }
             } else {
-                this.floatTipMats[i].color.setHex(this.floatOriginalTipColors[i]);
+                if (useDayLed && isBiteTake) {
+                    this.floatTipMats[i].color.setHex(0xff1100);
+                } else {
+                    this.floatTipMats[i].color.setHex(this.floatOriginalTipColors[i]);
+                }
+                if (this.floatOledSheathMats && this.floatOledSheathMats[i]) {
+                    this.floatOledSheathMats[i].opacity = 0.0;
+                }
+            }
+        }
+
+        if (this.floatOledCollarGlow && this.floatOledCollarGlow.material) {
+            this.floatOledCollarGlow.material.opacity = nightOled ? 0.88 : 0.0;
+            this.floatOledCollarGlow.material.color.setHex(isBiteTake ? 0xff1744 : 0x00ffd5);
+        }
+
+        const floatVisibleOnWater = !!(
+            this.floatGroup &&
+            this.floatGroup.visible &&
+            (this.state === FISHING_STATES.CASTING || this.state === FISHING_STATES.FLOAT_WAIT || this.state === FISHING_STATES.BITING)
+        );
+        if (this.floatNightPointLight) {
+            this.floatNightPointLight.intensity = (nightOled && floatVisibleOnWater) ? (isBiteTake ? 1.55 : 1.05) : 0.0;
+            this.floatNightPointLight.color.setHex(isBiteTake ? 0xff1744 : 0x00ffd5);
+        }
+        if (this.floatNightWaterGlow && this.floatNightWaterGlowMat) {
+            const showWaterGlow = nightOled && floatVisibleOnWater && (this.floatGroup.position.y > -0.34);
+            this.floatNightWaterGlow.visible = showWaterGlow;
+            if (showWaterGlow) {
+                this.floatNightWaterGlow.position.set(this.floatGroup.position.x, 0.0055, this.floatGroup.position.z);
+                const gScale = (isBiteTake ? 1.28 : 0.96) * pulse;
+                this.floatNightWaterGlow.scale.set(gScale, gScale, 1);
+                this.floatNightWaterGlowMat.color.setHex(isBiteTake ? 0xff1744 : 0x00ffd5);
             }
         }
     }
@@ -2088,6 +2250,8 @@ export class FishingGameplay {
         this.hideAllWaterSpray();
         this.floatGroup.visible = false;
         if (this.floatMeniscusRing) this.floatMeniscusRing.visible = false;
+        if (this.floatNightWaterGlow) this.floatNightWaterGlow.visible = false;
+        if (this.floatNightPointLight) this.floatNightPointLight.intensity = 0;
         this.fishingLine.visible = false;
 
         this.currentBendDown = 0.02;
@@ -2114,6 +2278,8 @@ export class FishingGameplay {
         this.fpvRig.visible = false;
         this.floatGroup.visible = false;
         if (this.floatMeniscusRing) this.floatMeniscusRing.visible = false;
+        if (this.floatNightWaterGlow) this.floatNightWaterGlow.visible = false;
+        if (this.floatNightPointLight) this.floatNightPointLight.intensity = 0;
         this.fishingLine.visible = false;
         this.fish3DGroup.visible = false;
         this.waterEntrySpray.visible = false;
@@ -2250,6 +2416,147 @@ export class FishingGameplay {
         return this.selectedRodLength;
     }
 
+    // Cấp mới số lượt Kích Mồi hiệu quả ngẫu nhiên cho ca câu (Mỗi 1 ca 5 tiếng random từ 5 đến 15 lần hiệu quả!)
+    resetTwitchShiftQuota(packageHours = 5) {
+        const shifts5h = Math.max(1, Math.round((packageHours || 5) / 5));
+        let total = 0;
+        for (let i = 0; i < shifts5h; i++) {
+            total += 5 + Math.floor(Math.random() * 11); // 5..15 lần cho mỗi ca 5 tiếng
+        }
+        this.twitchEffectiveLeft = total;
+        this.twitchEffectiveMax = total;
+        this.twitchBiteCountdown = 0;
+        this.twitchBubbleHintSpawned = false;
+        return { left: this.twitchEffectiveLeft, max: this.twitchEffectiveMax };
+    }
+
+    // NÚT KÍCH MỒI (Phím K): Nhấc nhử nhẹ đọt cần làm mồi nhúc nhích rụng sương
+    // - Mỗi ca 5 tiếng có 5-15 lần hiệu quả random
+    // - Khi còn lượt hiệu quả: 30% tỷ lệ cá ăn ngay sau đúng 5 giây (Bấm 2-3 vạch phao và giữ nguyên 3-5 giây)
+    twitchBait() {
+        if (this.state !== FISHING_STATES.FLOAT_WAIT) {
+            if (this.state === FISHING_STATES.CASTING) {
+                return { success: false, message: '⏳ Phao đang xuống nước — đợi phao đứng mục ổn định rồi hãy bấm Kích Mồi!' };
+            }
+            if (this.state === FISHING_STATES.BITING) {
+                return { success: false, message: '⚡ Phao đang có tín hiệu cá ăn rồi — canh nhịp GIẬT CẦN ngay!' };
+            }
+            return { success: false, message: '🎣 Hãy Vung Cần Ra Ổ Câu đợi phao đứng mục rồi mới bấm Kích Mồi!' };
+        }
+        if (this.isBareHook) {
+            return { success: false, message: '⚠️ Mồi trên lưỡi đã tan hết (Trơ lưỡi sắt)! Hãy thu cần vê mồi mới trước khi Kích Mồi!' };
+        }
+        if (this.twitchBiteCountdown > 0 || this.twitchCooldownTimer > 0) {
+            return { success: false, message: '⏳ Bạn vừa Kích Mồi xong — hãy giữ im cần và soi kỹ vạch phao trong 5 giây tới!' };
+        }
+
+        // Động tác vật lý nhấc nhử nhẹ đọt cần + tăm phao nhô nhẹ ~1.4 vạch rồi êm dần về mực câu
+        this.twitchRodAnimTimer = 0.68;
+        this.twitchCooldownTimer = 1.65;
+        this.floatVerticalOffset = 0.044;
+        this.hookBaitIntegrity = Math.max(0.06, this.hookBaitIntegrity - 0.06);
+        if (this.lastHookTargetInfo) {
+            this.lastHookTargetInfo.baitIntegrity = this.hookBaitIntegrity;
+        }
+        soundManager.playWaterSplash(0.32);
+        this.bubbleSystem.spawnRipple(this.floatTargetPos.x, this.floatTargetPos.z, 0.44);
+
+        // Kiểm tra quota 5-15 lần hiệu quả của ca câu 5h hiện tại
+        if (this.twitchEffectiveLeft <= 0) {
+            return {
+                success: true,
+                exhausted: true,
+                left: 0,
+                max: this.twitchEffectiveMax,
+                message: `🫧 Đã nhấc nhử mồi, nhưng ca này đã hết lượt Kích Mồi hiệu quả (0/${this.twitchEffectiveMax}) — cá dưới ổ đã quen bài nhử, hãy chờ cá ăn tự nhiên hoặc sang ca mới!`
+            };
+        }
+
+        this.twitchEffectiveLeft = Math.max(0, this.twitchEffectiveLeft - 1);
+
+        // 30% tỷ lệ cá sẽ ăn ngay sau đúng 5 giây!
+        const hit30Percent = Math.random() < 0.30;
+        if (hit30Percent) {
+            this.twitchBiteCountdown = 5.0;
+            this.twitchBubbleHintSpawned = false;
+        } else {
+            // 70% chưa đớp ngay: Bụi mồi rụng xuống giúp rút ngắn thời gian chờ cá tự nhiên
+            this.waitFishTimer = Math.max(2.0, this.waitFishTimer * 0.78);
+        }
+
+        return {
+            success: true,
+            triggered: hit30Percent,
+            left: this.twitchEffectiveLeft,
+            max: this.twitchEffectiveMax,
+            message: `⚡ Đã KÍCH MỒI (Còn ${this.twitchEffectiveLeft}/${this.twitchEffectiveMax} lần hiệu quả trong ca)! Chờ 5 giây soi kỹ: nếu phao BẤM 2–3 VẠCH giữ im 3–5s thì GIẬT NGAY là lụm cá!`
+        };
+    }
+
+    // Kích hoạt nhịp cá ăn đặc trưng sau 5 giây Kích Mồi: Bấm 2-3 vạch phao và giữ nguyên 3-5 giây!
+    startTwitchHoldBite() {
+        if (this.state !== FISHING_STATES.FLOAT_WAIT || this.isBareHook) return;
+        this.bubbleSystem.clearHookBaitTarget();
+
+        // Tìm con cá AI đang bơi gần ổ phao nhất để đồng bộ loài & cân nặng thực tế
+        let nearestFish = null;
+        let bestDist = 14.0;
+        if (this.bubbleSystem && Array.isArray(this.bubbleSystem.fishSchools)) {
+            for (const f of this.bubbleSystem.fishSchools) {
+                if (!f || f.isHooked) continue;
+                const d = Math.hypot(f.x - this.floatTargetPos.x, f.z - this.floatTargetPos.z);
+                if (d < bestDist) {
+                    bestDist = d;
+                    nearestFish = f;
+                }
+            }
+        }
+
+        this.pendingAIFish = nearestFish;
+        this.state = FISHING_STATES.BITING;
+        this.fishApproaching = false;
+        this.twitchBiteCountdown = 0;
+
+        this.bubbleSystem.spawnCarpBubbles(this.floatTargetPos.x, this.floatTargetPos.z, true, true);
+        this.bubbleSystem.spawnRipple(this.floatTargetPos.x, this.floatTargetPos.z, 0.68);
+
+        const tipMarks = (this.equipBonuses && this.equipBonuses.float && this.equipBonuses.float.tipMarks)
+            ? this.equipBonuses.float.tipMarks
+            : 11;
+        const markH = 0.352 / tipMarks;
+        const pressedMarks = Number((2.0 + Math.random() * 1.0).toFixed(1)); // Bấm đúng 2.0 - 3.0 vạch phao!
+        const pressDepth = pressedMarks * markH;
+        const holdDuration = Number((3.0 + Math.random() * 2.0).toFixed(2)); // Giữ nguyên vạch 3.0 - 5.0 giây!
+        const key = (nearestFish && nearestFish.speciesKey) ? nearestFish.speciesKey : 'CARP';
+
+        this.biteScript = {
+            scenario: 'TWITCH_HOLD',
+            stageIndex: 0,
+            stages: [
+                { name: 'PRESS_DOWN', duration: 0.18 },
+                { name: 'HOLD_BARS', duration: holdDuration }
+            ],
+            stageTime: 0,
+            willCommit: true,
+            isTakeWindow: false,
+            speciesKey: key,
+            pressedMarks,
+            pressDepth,
+            holdDuration,
+            driftX: 0,
+            driftZ: 0,
+            rippleTimer: 0,
+            flavorDrops: 0,
+            flavorSummary: '',
+            isFlavorOverdose: false
+        };
+
+        this.biteType = BITE_TYPES.QUICK_TAP;
+        this.biteMaxTime = holdDuration;
+        this.biteTimer = holdDuration;
+        this.bitePromptText = '';
+    }
+
     castGroundBait() {
         if (this.state !== FISHING_STATES.SEATED && this.state !== FISHING_STATES.FLOAT_WAIT && this.state !== FISHING_STATES.CASTING) {
             return { success: false, message: 'Hãy ngồi vào bến câu để xả mồi!' };
@@ -2303,6 +2610,7 @@ export class FishingGameplay {
         }
         this.hookBaitIntegrity = 1.0;
         this.isBareHook = false;
+        this.twitchBiteCountdown = 0;
         this.updateBaitTrayVisuals();
 
         this.state = FISHING_STATES.CASTING;
@@ -2367,9 +2675,12 @@ export class FishingGameplay {
             this.bendVelocity = -2.4;
 
             this.bubbleSystem.clearHookBaitTarget();
+            this.twitchBiteCountdown = 0;
+            this.updateFloatLedGlow(false);
             this.state = FISHING_STATES.SEATED;
             this.floatGroup.visible = false;
             if (this.floatMeniscusRing) this.floatMeniscusRing.visible = false;
+            if (this.floatNightWaterGlow) this.floatNightWaterGlow.visible = false;
             this.fishingLine.visible = false;
             this.fish3DGroup.visible = false;
             this.hideAllWaterSpray();
@@ -2386,6 +2697,7 @@ export class FishingGameplay {
     // 6 KỊCH BẢN TÍN HIỆU PHAO ĐÀI CHÂN THỰC (Bềnh, Mất Hình, Giã Gạo, Bấm Giữ 1 Nấc, Ăn 2 Nhịp, Lướt Chạy Phao)
     startFishBite(aiFish = null) {
         if (this.state === FISHING_STATES.BITING || this.state === FISHING_STATES.FIGHTING) return;
+        this.twitchBiteCountdown = 0;
         this.bubbleSystem.clearHookBaitTarget();
         this.pendingAIFish = aiFish;
         this.state = FISHING_STATES.BITING;
@@ -2559,10 +2871,14 @@ export class FishingGameplay {
         }
 
         const keyName = this.biteScript ? (SPECIES[this.biteScript.speciesKey] || SPECIES.CARP).name : 'Cá';
+        const wasTwitchHold = !!(this.biteScript && this.biteScript.scenario === 'TWITCH_HOLD');
+        const twMarks = wasTwitchHold ? this.biteScript.pressedMarks : 2.5;
+        const twHold = wasTwitchHold ? this.biteScript.holdDuration : 4.0;
         this.biteScript = null;
         this.pendingAIFish = null;
         this.state = FISHING_STATES.FLOAT_WAIT;
-        this.floatVerticalOffset = 0;
+        // Nếu cá nhả mồi sau khi bấm giữ 2-3 vạch từ Kích Mồi -> phao nảy nhẹ trồi trả lại mực cân ban đầu!
+        this.floatVerticalOffset = wasTwitchHold ? 0.014 : 0;
         const fPos = this.floatTargetPos;
         // Nếu bị giật trượt nhiều lần liên tiếp, cá sẽ ăn cực kỳ chậm (nửa tiếng - 1 tiếng giờ hồ mới có nhịp lại)
         let missPenalty = 0;
@@ -2579,7 +2895,10 @@ export class FishingGameplay {
         }
         let msg;
         let evtType;
-        if (reason === 'MOM_END') {
+        if (wasTwitchHold) {
+            msg = `💨 Cá ăn sau KÍCH MỒI (đã bấm giữ ${twMarks} vạch phao suốt ${twHold.toFixed(1)}s) nhưng không giật nên cá đã NHẢ MỒI trồi phao lại!`;
+            evtType = 'MISSED';
+        } else if (reason === 'MOM_END') {
             msg = `😤 ${keyName} MÓM! Cá thăm dò rồi nhả mồi bơi đi, phao trở lại im lìm. Kiên nhẫn đợi nhịp khác!`;
             evtType = 'MOM';
         } else {
@@ -2678,6 +2997,8 @@ export class FishingGameplay {
         let praiseText = 'Đóng trúng hàm trên! Cần đã cong vút chữ C!';
         if (s.scenario === 'LIFT') {
             praiseText = '🎯 PHAO BỀNH CẢ CỦ (100% DÍNH CÁ)! Cá đội chì nuốt trọn lưỡi — đóng chuẩn tuyệt đối!';
+        } else if (s.scenario === 'TWITCH_HOLD') {
+            praiseText = `⚡ KÍCH MỒI LỤM CÁ! Cá bấm ${s.pressedMarks || 2.5} vạch giữ im — Đóng chuẩn 100% ngập hàm!`;
         } else if (s.scenario === 'SUBMERGE') {
             praiseText = '🔥 ĐÓNG TRÚNG NHỊP PHAO MẤT HÌNH (50/50 THÀNH CÔNG)! Cần cong vút chữ C, cá đóng sâu!';
         } else if (s.scenario === 'MORTAR') {
@@ -2839,6 +3160,8 @@ export class FishingGameplay {
 
         this.floatGroup.visible = false;
         if (this.floatMeniscusRing) this.floatMeniscusRing.visible = false;
+        if (this.floatNightWaterGlow) this.floatNightWaterGlow.visible = false;
+        if (this.floatNightPointLight) this.floatNightPointLight.intensity = 0;
         this.rodRestSupport.visible = false;
         this.landingNetGroup.visible = false;
         this.fish3DGroup.visible = true;
@@ -3802,6 +4125,8 @@ export class FishingGameplay {
         this.applyArticulatedRodPose(1.0);
         this.floatGroup.visible = false;
         if (this.floatMeniscusRing) this.floatMeniscusRing.visible = false;
+        if (this.floatNightWaterGlow) this.floatNightWaterGlow.visible = false;
+        if (this.floatNightPointLight) this.floatNightPointLight.intensity = 0;
         this.fishingLine.visible = false;
         this.fish3DGroup.visible = false;
         this.waterEntrySpray.visible = false;
@@ -3865,6 +4190,7 @@ export class FishingGameplay {
         // 2. CẬP NHẬT VẬT LÝ HẠ THỦY 3 GIAI ĐOẠN & TÍN HIỆU BÁO CÁ CỦA PHAO ĐÀI THÂN BẦU
         if (this.state === FISHING_STATES.CASTING) {
             this.castElapsed += delta;
+            this.updateFloatLedGlow(false);
             this.floatGroup.rotation.order = 'YXZ';
             this.floatGroup.rotation.y = baseFloatYaw;
 
@@ -4112,6 +4438,21 @@ export class FishingGameplay {
         } else if (this.state === FISHING_STATES.FLOAT_WAIT) {
             this.floatBobAngle += delta * 2.6;
             this.floatVerticalOffset += (0.0 - this.floatVerticalOffset) * Math.min(1, delta * 3.5);
+            this.updateFloatLedGlow(false);
+
+            // ĐẾM NGƯỢC 5 GIÂY SAU KHI KÍCH MỒI TRÚNG 30%: Đúng 5s cá sẽ vào bấm giữ 2-3 vạch phao!
+            if (this.twitchBiteCountdown > 0 && !this.isBareHook) {
+                this.twitchBiteCountdown -= delta;
+                if (!this.twitchBubbleHintSpawned && this.twitchBiteCountdown <= 1.6) {
+                    this.twitchBubbleHintSpawned = true;
+                    this.bubbleSystem.spawnCarpBubbles(fPos.x, fPos.z, true, false);
+                }
+                if (this.twitchBiteCountdown <= 0) {
+                    this.twitchBiteCountdown = 0;
+                    this.startTwitchHoldBite();
+                    return;
+                }
+            }
 
             // CẬP NHẬT ĐỘ TAN RÃ CỦA VIÊN MỒI TRÊN LƯỠI THEO THỜI GIAN THỰC
             const dissolveDuration = (this.activeHookBait && this.activeHookBait.dissolveTime) ? this.activeHookBait.dissolveTime : 72;
@@ -4184,8 +4525,23 @@ export class FishingGameplay {
                 let rotZ = 0;
                 s.isTakeWindow = false;
 
+                // 0. Kịch bản ĐẶC TRƯNG KÍCH MỒI: CÁ BẤM 2-3 VẠCH PHAO & GIỮ NGUYÊN VẠCH 3-5 GIÂY (Giật là lụm 100%, không giật cá nhả mồi!)
+                if (s.scenario === 'TWITCH_HOLD') {
+                    const depth = s.pressDepth || 0.08;
+                    if (stageName === 'PRESS_DOWN') {
+                        // Cá hút gọn viên mồi vừa nhử -> phao sập gọn đúng 2-3 vạch!
+                        y = eq - depth * k;
+                        rotZ = -0.04 * k;
+                        s.isTakeWindow = (s.stageTime >= 0.06);
+                    } else if (stageName === 'HOLD_BARS') {
+                        // Giữ nguyên đứng im ở vạch đã bấm suốt 3-5 giây chờ cần thủ giật!
+                        y = eq - depth;
+                        rotZ = 0;
+                        s.isTakeWindow = true;
+                    }
+                }
                 // 1. Kịch bản: PHAO BỀNH CẢ CỦ (LIFT — Tỷ lệ dính cá 100%!)
-                if (s.scenario === 'LIFT') {
+                else if (s.scenario === 'LIFT') {
                     if (stageName === 'NIBBLE') {
                         const pulse = Math.sin(s.stageTime * 12);
                         y = eq - Math.max(0, pulse) * 0.015;

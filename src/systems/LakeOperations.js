@@ -63,6 +63,7 @@ export class LakeOperations {
         // Sự kiện vui đời thực: Mỗi ngày ngẫu nhiên 1 con cá chết nổi lềnh bềnh -> Chủ Hồ vác vợt ra hớt!
         this.deadFishEventDay = 0;
         this.deadFishTriggerHour = 8.4 + Math.random() * 7.0;
+        this.nightFloatAnnouncedDay = 0;
     }
 
     // Chuyển đổi thời tiết tự nhiên khi bước sang ngày mới (không có quy luật cố định, ổn định nhiều ngày như ngoài đời)
@@ -278,14 +279,19 @@ export class LakeOperations {
         this.ticket = { active: true, hoursLeft: pkg.effectiveHours, packageHours: hours, price: pkg.price };
         this.ticketOfferPending = false;
 
-        // Bắt đầu ca câu mới -> reset thống kê ca
+        // Bắt đầu ca câu mới -> reset thống kê ca & random mới 5-15 lần Kích Mồi hiệu quả trên mỗi ca 5 tiếng!
         this.sessionFishCount = 0;
         this.sessionTotalWeight = 0;
         this.sessionBiggestFish = 0;
         this.sessionPrizeBonus = 0;
+        let twitchInfoText = '';
+        if (this.gameplay && typeof this.gameplay.resetTwitchShiftQuota === 'function') {
+            const q = this.gameplay.resetTwitchShiftQuota(hours);
+            twitchInfoText = ` • Kèm ${q.max} lượt Kích Mồi hiệu quả (Phím K)!`;
+        }
 
         soundManager.playClick();
-        this.pushEvent(`🎫 Bạn đã trả ${pkg.price.toLocaleString()}đ cho ${pkg.name}. Nhân viên bấm giờ — còn ${this.formatHours(pkg.effectiveHours)} câu!`, 'SYSTEM');
+        this.pushEvent(`🎫 Bạn đã trả ${pkg.price.toLocaleString()}đ cho ${pkg.name}. Nhân viên bấm giờ — còn ${this.formatHours(pkg.effectiveHours)} câu${twitchInfoText}`, 'SYSTEM');
         return { success: true, pkg };
     }
 
@@ -606,6 +612,16 @@ export class LakeOperations {
                         this.lastFeedingWindowKey = fw.key;
                         this.pushEvent(`${fw.badge}: ${fw.desc}`, fw.key.startsWith('PEAK') ? 'GOLD' : (fw.pressFloatOnly ? 'WARN' : 'INFO'));
                     }
+                }
+            }
+
+            // Đúng 18:00 Tối (6h chiều tối): Thông báo bật Phao Đêm Điện Tử OLED phát sáng săn hàng đêm!
+            if (this.nightFloatAnnouncedDay !== this.day && this.hour >= 18.0) {
+                this.nightFloatAnnouncedDay = this.day;
+                const nightMsg = '🌙 18:00 TỐI: Trời đã sập tối — Hệ thống tự động bật PHAO ĐÊM OLED phát sáng quang học! Tăm phao sáng rực từng vạch và đổi Đỏ Hồng khi cá cắn!';
+                this.pushEvent(nightMsg, 'GOLD');
+                if (this.ui && typeof this.ui.showScenarioToast === 'function') {
+                    this.ui.showScenarioToast('🌙 BẬT PHAO ĐÊM ĐIỆN TỬ OLED (18:00)', 'Phao câu đã chuyển sang chế độ OLED phát sáng rực rỡ trên mặt nước tối!', 'GOLD');
                 }
             }
 

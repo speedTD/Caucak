@@ -181,6 +181,7 @@ export class UIManager {
                     <div class="menu-btn-grid">
                         <button id="btn-toggle-weather" class="menu-item-btn btn-weather-sunny">☀️ Nắng / Mưa (T)</button>
                         <button id="btn-time-speed" class="menu-item-btn">⏩ Giờ: 1x</button>
+                        <button id="btn-toggle-night18" class="menu-item-btn">🌙 Tối 18h (Phao OLED)</button>
                         <button id="btn-toggle-ground" class="menu-item-btn">🛣️ Nền Bờ (P)</button>
                         <button id="btn-toggle-touch" class="menu-item-btn">📱 Phím Mobile</button>
                         <button id="btn-menu-mute" class="menu-item-btn">🔊 Âm Thanh: BẬT</button>
@@ -364,6 +365,10 @@ export class UIManager {
                         <span class="key-badge">F</span>
                         <span class="key-label">Xả mồi tụ ổ</span>
                     </div>
+                    <div class="key-row highlight-key">
+                        <span class="key-badge">K</span>
+                        <span class="key-label">Kích mồi (30% ăn sau 5s)</span>
+                    </div>
                     <div class="key-row">
                         <span class="key-badge">Z</span>
                         <span class="key-label">Kính phân cực Zoom phao</span>
@@ -440,6 +445,7 @@ export class UIManager {
                 </div>
                 <div class="panel-actions-row">
                     <button class="btn-action-main btn-cast" id="btn-act-cast">🎣 VUNG CẦN RA Ổ CÂU</button>
+                    <button class="btn-action-sub btn-twitch" id="btn-act-twitch" title="Nhấc nhử đọt cần Kích Mồi (30% cá ăn sau 5s, bấm giữ 2-3 vạch 3-5s • 5-15 lần/ca 5h)">🎯 KÍCH MỒI (K)</button>
                     <button class="btn-action-sub btn-ground" id="btn-act-ground">🥣 XẢ Ổ (F)</button>
                     <button class="btn-action-sub btn-rodlen" id="btn-act-rodlen" title="Đổi tầm cần xa/gần (3.6m ven bờ -> 7.2m rãnh sâu)">📏 Tầm: 5.4m</button>
                     <button class="btn-action-sub btn-umbrella" id="btn-act-umbrella" title="Bật / Nghiêng 45° chắn nắng xiên / Gập Ô Câu Đài (Phím O)">⛱️ Ô: Mở</button>
@@ -459,9 +465,12 @@ export class UIManager {
                 <div class="fish-mind-log" id="fish-mind-log">Mặt nước tĩnh lặng</div>
             </div>
 
-            <!-- NÚT GIẬT CẦN THƯỜNG TRỰC KHI ĐANG BUÔNG CẦN / CÁ ĂN REALTIME -->
+            <!-- NÚT GIẬT CẦN & NÚT KÍCH MỒI THƯỜNG TRỰC KHI ĐANG BUÔNG CẦN / CÁ ĂN REALTIME -->
             <div class="strike-huge-btn-container" id="strike-container" style="display: none;">
-                <button class="btn-strike-huge" id="btn-strike-act">⚡ GIẬT CẦN (SPACE / CLICK)</button>
+                <div class="strike-inline-bar">
+                    <button class="btn-strike-huge" id="btn-strike-act">⚡ GIẬT CẦN (SPACE / CLICK)</button>
+                    <button class="btn-twitch-huge" id="btn-strike-twitch" title="Nhấc nhử Kích Mồi: 30% cá ăn sau 5s (Bấm 2-3 vạch giữ 3-5s)">🎯 KÍCH MỒI (K)</button>
+                </div>
             </div>
 
             <!-- Action Prompt trung tâm -->
@@ -956,6 +965,7 @@ export class UIManager {
                 <!-- Cụm Phím Thao Tác Chuyên Nghiệp Cho Mobile (Chỉ hiện nút ấn được theo đúng trạng thái!) -->
                 <div class="mobile-action-cluster" id="mobile-actions">
                     <button class="mobile-action-btn btn-m-strike" id="btn-m-strike">⚡ GIẬT CẦN</button>
+                    <button class="mobile-action-btn btn-m-twitch" id="btn-m-twitch">🎯 Kích Mồi</button>
                     <button class="mobile-action-btn btn-m-cast" id="btn-m-cast">🎣 Vung Cần</button>
                     <button class="mobile-action-btn btn-m-ground" id="btn-m-ground">🥣 Xả Mồi</button>
                     <button class="mobile-action-btn btn-m-stand" id="btn-m-stand">🪑 Đứng/Ngồi</button>
@@ -1074,6 +1084,28 @@ export class UIManager {
             };
         }
 
+        // Nút CHUYỂN NHANH TỐI 18:00 (BẬT PHAO ĐÊM OLED) / SÁNG 08:30
+        const btnToggleNight18 = document.getElementById('btn-toggle-night18');
+        if (btnToggleNight18) {
+            btnToggleNight18.onclick = () => {
+                if (!this.lakeOps) return;
+                soundManager.playClick();
+                if (this.lakeOps.hour < 18.0) {
+                    this.lakeOps.hour = 18.05;
+                    if (this.environment) this.environment.currentHour = 18.05;
+                    btnToggleNight18.innerText = '☀️ Về Ban Ngày (08:30)';
+                    this.closeMainMenu();
+                    this.showScenarioToast('🌙 CÂU ĐÊM 18:00 (PHAO OLED)', 'Đã chuyển giờ sang 18:03 Tối! Phao Đêm Điện Tử OLED phát sáng đã bật!', 'GOLD');
+                } else {
+                    this.lakeOps.hour = 8.5;
+                    if (this.environment) this.environment.currentHour = 8.5;
+                    btnToggleNight18.innerText = '🌙 Tối 18h (Phao OLED)';
+                    this.closeMainMenu();
+                    this.showPrompt('☀️ Đã chuyển về 08:30 Sáng!');
+                }
+            };
+        }
+
         // Nút BẬT/TẮT CỤM PHÍM CẢM ỨNG DI ĐỘNG (MOBILE VIRTUAL CONTROLS)
         const btnToggleTouch = document.getElementById('btn-toggle-touch');
         const mobileControls = document.getElementById('mobile-controls');
@@ -1112,6 +1144,26 @@ export class UIManager {
         bindTouchMove('btn-m-down', 'backward');
         bindTouchMove('btn-m-left', 'left');
         bindTouchMove('btn-m-right', 'right');
+
+        // Hàm dùng chung kích hoạt Nút KÍCH MỒI (PC / Mobile / Phím K)
+        const handleTwitchBaitClick = (e) => {
+            if (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            if (!this.gameplay || typeof this.gameplay.twitchBait !== 'function') return;
+            const res = this.gameplay.twitchBait();
+            if (res && res.message) {
+                this.showPrompt(res.message);
+            }
+        };
+
+        const btnActTwitch = document.getElementById('btn-act-twitch');
+        if (btnActTwitch) btnActTwitch.onclick = handleTwitchBaitClick;
+        const btnStrikeTwitch = document.getElementById('btn-strike-twitch');
+        if (btnStrikeTwitch) btnStrikeTwitch.onclick = handleTwitchBaitClick;
+        const btnMTwitch = document.getElementById('btn-m-twitch');
+        if (btnMTwitch) btnMTwitch.onclick = handleTwitchBaitClick;
 
         // Nút Giật cần Mobile
         const btnMStrike = document.getElementById('btn-m-strike');
@@ -1745,6 +1797,11 @@ export class UIManager {
             if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
             if (e.code === 'KeyT') this.toggleWeather();
             if (e.code === 'KeyP') this.togglePavement();
+            if (e.code === 'KeyK' && this.gameplay && this.gameplay.state !== 'ROAM' && this.gameplay.twitchBait) {
+                e.preventDefault();
+                const res = this.gameplay.twitchBait();
+                if (res && res.message) this.showPrompt(res.message);
+            }
             if (e.code === 'KeyO' && this.gameplay && this.gameplay.state !== 'ROAM' && this.gameplay.cycleUmbrellaPose) {
                 soundManager.playClick();
                 const info = this.gameplay.cycleUmbrellaPose();
@@ -5206,24 +5263,39 @@ export class UIManager {
             }
         }
 
-        // 0. Kính Ngắm Phao Cận Cảnh HD (Picture-in-Picture Float Cam)
+        // 0. Kính Ngắm Phao Cận Cảnh HD (Picture-in-Picture Float Cam + Chế Độ Phao Đêm OLED từ 18:00)
         const pipFrame = document.getElementById('pip-float-frame');
         if (pipFrame) {
             if (this.gameplay.shouldRenderFloatPiP()) {
                 pipFrame.style.display = 'flex';
+                const isOledNight = !!(this.gameplay.isNightFloatTime && this.gameplay.isNightFloatTime());
+                pipFrame.classList.toggle('pip-night-oled', isOledNight);
                 const statusEl = document.getElementById('pip-float-status');
                 const footerEl = document.getElementById('pip-float-footer');
                 if (this.gameplay.state === 'CASTING') {
                     statusEl.innerText = this.gameplay.castPhaseLabel || 'Đang xuống nước...';
                     statusEl.className = 'pip-status-tag pip-warn';
-                    if (footerEl) footerEl.innerText = 'Phao Bầu Nano: Nằm ngang ➔ Đứng ➔ Mất bầu';
+                    if (footerEl) {
+                        footerEl.innerText = isOledNight
+                            ? '🌙 PHAO ĐÊM OLED: Nằm ngang ➔ Đứng ➔ Mất bầu'
+                            : 'Phao Bầu Nano: Nằm ngang ➔ Đứng ➔ Mất bầu';
+                    }
                 } else {
                     const isHoDau = this.rigConfig && this.rigConfig.fishingStyle === 'HO_DAU';
                     const cal = this.gameplay.activeCalibration;
                     const visMarks = isHoDau ? '2,2' : (cal ? cal.visibleMarks : 3);
-                    statusEl.innerText = isHoDau ? '⚓ Hố Đấu (2,2 nấc)' : (cal ? cal.shortTag : 'Cân 7 Câu 3');
-                    statusEl.className = 'pip-status-tag';
-                    if (footerEl) footerEl.innerText = `Phao Nano 11 Nấc • Nổi chuẩn ${visMarks} nấc trên mặt nước`;
+                    const calTag = isHoDau ? '⚓ Hố Đấu (2,2 nấc)' : (cal ? cal.shortTag : 'Cân 7 Câu 3');
+                    statusEl.innerText = isOledNight ? `🌙 OLED • ${calTag}` : calTag;
+                    statusEl.className = isOledNight ? 'pip-status-tag pip-oled-tag' : 'pip-status-tag';
+                    if (footerEl) {
+                        if (this.gameplay.twitchBiteCountdown > 0) {
+                            footerEl.innerText = `⚡ Đã Kích Mồi • Soi kỹ 2–3 vạch phao (${Math.ceil(this.gameplay.twitchBiteCountdown)}s)...`;
+                        } else {
+                            footerEl.innerText = isOledNight
+                                ? `🌙 Phao Đêm OLED Phát Sáng • Nổi ${visMarks} vạch`
+                                : `Phao Nano 11 Nấc • Nổi chuẩn ${visMarks} nấc trên mặt nước`;
+                        }
+                    }
                 }
             } else {
                 pipFrame.style.display = 'none';
@@ -5291,6 +5363,32 @@ export class UIManager {
             } else {
                 castBtn.innerText = '🔄 THU CẦN VỀ';
                 castBtn.classList.add('btn-retrieve');
+            }
+
+            // Đồng bộ hiển thị lượt Kích Mồi hiệu quả còn lại trong ca (5-15 lần random / ca 5h)
+            const twLeft = typeof this.gameplay.twitchEffectiveLeft === 'number' ? this.gameplay.twitchEffectiveLeft : 0;
+            const twMax = typeof this.gameplay.twitchEffectiveMax === 'number' ? this.gameplay.twitchEffectiveMax : 10;
+            const canTwitchNow = (this.gameplay.state === 'FLOAT_WAIT' && !this.gameplay.isBareHook && this.gameplay.twitchBiteCountdown <= 0);
+            const isWaiting5s = (this.gameplay.state === 'FLOAT_WAIT' && this.gameplay.twitchBiteCountdown > 0);
+            const btnActTw = document.getElementById('btn-act-twitch');
+            if (btnActTw) {
+                btnActTw.innerText = isWaiting5s
+                    ? `⏳ CHỜ PHAO (${Math.ceil(this.gameplay.twitchBiteCountdown)}s)`
+                    : `🎯 KÍCH MỒI (K) [${twLeft}/${twMax}]`;
+                btnActTw.classList.toggle('twitch-ready', canTwitchNow && twLeft > 0);
+                btnActTw.classList.toggle('twitch-waiting', isWaiting5s);
+            }
+            const btnStrikeTw = document.getElementById('btn-strike-twitch');
+            if (btnStrikeTw) {
+                btnStrikeTw.style.display = (this.gameplay.state === 'FLOAT_WAIT') ? 'inline-flex' : 'none';
+                btnStrikeTw.innerText = isWaiting5s
+                    ? `⏳ Soi 2–3 vạch (${Math.ceil(this.gameplay.twitchBiteCountdown)}s)`
+                    : `🎯 KÍCH MỒI (K) [${twLeft}]`;
+                btnStrikeTw.classList.toggle('twitch-waiting', isWaiting5s);
+            }
+            const btnMTw = document.getElementById('btn-m-twitch');
+            if (btnMTw) {
+                btnMTw.innerText = `🎯 Kích [${twLeft}]`;
             }
 
             // Cập nhật thanh quy trình 4 bước câu đài

@@ -2268,11 +2268,18 @@ export class Environment {
             this.waterMaterial.normalScale.set(nScale, nScale);
         }
 
-        // Cập nhật bầu trời, mây Volumetric FBM và ánh sáng theo Thời Tiết + Giờ Trong Ngày (Bình Minh / Trưa / Hoàng Hôn / Câu Đêm)
-        const h = this.currentHour || 9.0;
-        const isDawn = h < 7.4;
-        const isSunset = h >= 16.5 && h < 18.6;
-        const isNight = h >= 18.6;
+        // Cập nhật bầu trời, mây Volumetric FBM và ánh sáng theo Thời Tiết + Giờ Trong Ngày (Bình Minh / Trưa / Hoàng Hôn / Câu Đêm từ 18:00)
+        const h = ((this.currentHour || 9.0) % 24 + 24) % 24;
+        const isDawn = h >= 5.8 && h < 7.4;
+        const isSunset = h >= 16.5 && h < 18.0;
+        const isNight = h >= 18.0 || h < 5.8;
+
+        if (this.waterMaterial && isNight) {
+            // Ban đêm từ 18:00 mặt nước thẫm màu xanh đêm dịu để làm nổi bật Phao Đêm OLED phát sáng rực rỡ!
+            this.waterMaterial.color.lerp(new THREE.Color(0x091f2c), lerpWeather * 1.4);
+            this.waterMaterial.emissive.lerp(new THREE.Color(0x061624), lerpWeather * 1.4);
+            this.waterMaterial.emissiveIntensity = 0.24;
+        }
 
         if (this.skyMesh && this.skyMesh.material && this.skyMesh.material.uniforms) {
             const u = this.skyMesh.material.uniforms;
