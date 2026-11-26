@@ -218,6 +218,51 @@ export class BaitMixingSystem {
         };
     }
 
+    // Ước tính sát thực tế số lượng viên mồi câu / con ốc móc / lượt ngô móc & nắm xả được vê ra từ chậu mồi
+    static estimateYield(mode, camKg, snailKg, cornCobs, waterRatio = 0.8, firmness = 'MEDIUM') {
+        const firmMul = firmness === 'SOFT' ? 0.88 : (firmness === 'HARD' ? 1.14 : 1.0);
+        const waterExpand = 0.92 + Math.min(0.26, Math.max(0, (waterRatio - 0.5) * 0.36));
+
+        let hookCharges = 24;
+        let groundCharges = 10;
+        let unitHookLabel = 'viên mồi';
+        let unitGroundLabel = 'nắm xả';
+
+        if (mode === 'SNAIL') {
+            // 1kg ốc (~140-180 con) lọc con đẹp móc lưỡi được ~52 lượt + ốc đập trộn cám ủ xả ổ ~16 muôi/kg
+            const rawHook = snailKg * 52 + camKg * 14;
+            const rawGround = snailKg * 12 + camKg * 14 + cornCobs * 1.2;
+            hookCharges = Math.max(18, Math.min(180, Math.round(rawHook * firmMul)));
+            groundCharges = Math.max(8, Math.min(80, Math.round(rawGround)));
+            unitHookLabel = 'con ốc móc';
+            unitGroundLabel = 'muôi xả';
+        } else if (mode === 'CORN') {
+            // 1 bắp ngô (~280 hạt): 10 bắp ngô tách hạt cho ~70 lượt móc đôi (2-3 hạt/lưỡi) + ~25 nắm xả hạt ngô
+            const rawHook = cornCobs * 7.0 + camKg * 16;
+            const rawGround = cornCobs * 2.5 + camKg * 12 + snailKg * 6;
+            hookCharges = Math.max(16, Math.min(200, Math.round(rawHook * firmMul)));
+            groundCharges = Math.max(8, Math.min(85, Math.round(rawGround)));
+            unitHookLabel = 'lượt ngô móc';
+            unitGroundLabel = 'nắm xả ngô';
+        } else {
+            // Câu Cám: 1kg cám nền nở với nước vê được ~44 đôi mồi câu chuẩn đài + ~14 nắm xả ổ
+            const rawHook = camKg * 44 * waterExpand + cornCobs * 2.5 + snailKg * 10;
+            const rawGround = camKg * 14 * waterExpand + snailKg * 8 + cornCobs * 1.5;
+            hookCharges = Math.max(16, Math.min(180, Math.round(rawHook * firmMul)));
+            groundCharges = Math.max(6, Math.min(75, Math.round(rawGround)));
+            unitHookLabel = 'viên mồi';
+            unitGroundLabel = 'nắm xả';
+        }
+
+        return {
+            hookCharges,
+            groundCharges,
+            unitHookLabel,
+            unitGroundLabel,
+            yieldSummary: `${hookCharges} ${unitHookLabel} • ${groundCharges} ${unitGroundLabel}`
+        };
+    }
+
     // Phân tích toàn diện Chậu Pha Mồi hiện tại
     analyzeRecipe(shopItemsMap, currentWeather = 'SUNNY') {
         const mode = this.currentMix.fishingMode || 'CAM';
@@ -499,6 +544,15 @@ export class BaitMixingSystem {
                 ? `Chậu Ngô Ủ (${ingredientSummary})`
                 : `Chậu Cám Đài (${ingredientSummary})`);
 
+        const yieldInfo = BaitMixingSystem.estimateYield(
+            mode,
+            camKg,
+            snailKg,
+            cornCobs,
+            wRatio,
+            this.currentMix.baitFirmness || 'MEDIUM'
+        );
+
         return {
             valid: true,
             fishingMode: mode,
@@ -528,12 +582,17 @@ export class BaitMixingSystem {
             waterStatusTag: ratioBadge || waterEffect.statusTag,
             textureStatus,
             detectedCombos,
-            flavorTags
+            flavorTags,
+            estimatedHookCharges: yieldInfo.hookCharges,
+            estimatedGroundCharges: yieldInfo.groundCharges,
+            unitHookLabel: yieldInfo.unitHookLabel,
+            unitGroundLabel: yieldInfo.unitGroundLabel,
+            yieldSummary: yieldInfo.yieldSummary
         };
     }
 
     // Nhào trộn toàn bộ nguyên liệu + hương liệu trong chậu thành Mồi Câu & Mồi Xả
-    mixBait(shopItemsMap, currentWeather = 'SUNNY', playerInventory = null) {
+    mixBait(shopItemsMap, currentWeather = 'SUNNY', playerInventory = null, trayCapacityBonus = 1.0) {
         const analysis = this.analyzeRecipe(shopItemsMap, currentWeather);
         if (!analysis.valid) {
             return { success: false, message: analysis.message };
@@ -597,10 +656,12 @@ export class BaitMixingSystem {
         };
         const fInfo = firmnessMap[firmness] || firmnessMap.MEDIUM;
 
-        // Số viên mồi câu & nắm xả tỉ lệ thuận với lượng đồ đã bỏ vào chậu
-        const totalBulk = analysis.camKg + analysis.snailKg + analysis.cornCobs * 0.12;
-        const hookCharges = Math.max(10, Math.min(28, Math.round(10 + totalBulk * 4)));
-        const groundCharges = Math.max(6, Math.min(18, Math.round(5 + totalBulk * 3)));
+        // Số lượng mồi được vê ra sát thực tế câu đài + cộng hưởng khay mồi giữ ẩm chống hao hụt
+        const padMul = Math.max(1.0, Number(trayCapacityBonus) || 1.0);
+        const hookCharges = Math.round((analysis.estimatedHookCharges || 40) * padMul);
+        const groundCharges = Math.round((analysis.estimatedGroundCharges || 14) * padMul);
+        const unitHookLabel = analysis.unitHookLabel || 'viên mồi';
+        const unitGroundLabel = analysis.unitGroundLabel || 'nắm xả';
 
         const modeMeta = FISHING_MODES[analysis.fishingMode] || FISHING_MODES.CAM;
 
@@ -626,6 +687,7 @@ export class BaitMixingSystem {
             rigStyleLabel: rigMap[rigStyle] || rigMap.STANDARD,
             charges: hookCharges,
             maxCharges: hookCharges,
+            unitLabel: unitHookLabel,
             combos: analysis.detectedCombos,
             flavorTags: analysis.flavorTags,
             waterRatio: this.currentMix.waterRatio
@@ -643,6 +705,7 @@ export class BaitMixingSystem {
             bubbleSpurRate: analysis.isFlavorOverdose ? 2.45 : (1.2 + (analysis.bigCarpScore / 80)),
             charges: groundCharges,
             maxCharges: groundCharges,
+            unitLabel: unitGroundLabel,
             combos: analysis.detectedCombos
         };
 

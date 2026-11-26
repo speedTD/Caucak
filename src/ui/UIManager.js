@@ -442,6 +442,7 @@ export class UIManager {
                     <button class="btn-action-main btn-cast" id="btn-act-cast">🎣 VUNG CẦN RA Ổ CÂU</button>
                     <button class="btn-action-sub btn-ground" id="btn-act-ground">🥣 XẢ Ổ (F)</button>
                     <button class="btn-action-sub btn-rodlen" id="btn-act-rodlen" title="Đổi tầm cần xa/gần (3.6m ven bờ -> 7.2m rãnh sâu)">📏 Tầm: 5.4m</button>
+                    <button class="btn-action-sub btn-umbrella" id="btn-act-umbrella" title="Bật / Nghiêng 45° chắn nắng xiên / Gập Ô Câu Đài (Phím O)">⛱️ Ô: Mở</button>
                     <button class="btn-action-sub btn-zoom" id="btn-act-zoom">🎯 ZOOM (Z)</button>
                     <button class="btn-action-sub btn-stand" id="btn-act-stand">🚶 ĐỨNG (E)</button>
                 </div>
@@ -676,6 +677,7 @@ export class UIManager {
                             <div class="recipe-analysis-card" id="recipe-analysis">
                                 <div class="water-rule-banner" id="ana-water-status">✅ TỶ LỆ HỢP LÝ</div>
                                 <div class="analysis-stats-grid">
+                                    <div class="score-line" style="grid-column: span 2; background: rgba(16,185,129,0.14); border: 1px solid rgba(52,211,153,0.35); padding: 4px 8px; border-radius: 6px;">🤲 Mồi Vê Ra Khay: <b id="ana-yield-count" style="color:#6ee7b7;">--</b></div>
                                     <div class="score-line">Liều Hương: <b id="ana-flavor-drops">--</b></div>
                                     <div class="score-line">Hấp Dẫn Cá: <b id="ana-carp-score">--</b></div>
                                     <div class="score-line">Săn Hàng To: <b id="ana-big-score">--</b></div>
@@ -1437,6 +1439,17 @@ export class UIManager {
             };
         }
 
+        const btnUmbrella = document.getElementById('btn-act-umbrella');
+        if (btnUmbrella) {
+            btnUmbrella.onclick = () => {
+                if (!this.gameplay || !this.gameplay.cycleUmbrellaPose) return;
+                soundManager.playClick();
+                const info = this.gameplay.cycleUmbrellaPose();
+                btnUmbrella.innerText = info.shortBtn;
+                this.showPrompt(info.message);
+            };
+        }
+
         const btnMenuOnline = document.getElementById('btn-menu-toggle-online');
         if (btnMenuOnline) {
             btnMenuOnline.onclick = () => {
@@ -1732,6 +1745,13 @@ export class UIManager {
             if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
             if (e.code === 'KeyT') this.toggleWeather();
             if (e.code === 'KeyP') this.togglePavement();
+            if (e.code === 'KeyO' && this.gameplay && this.gameplay.state !== 'ROAM' && this.gameplay.cycleUmbrellaPose) {
+                soundManager.playClick();
+                const info = this.gameplay.cycleUmbrellaPose();
+                const btnUmb = document.getElementById('btn-act-umbrella');
+                if (btnUmb) btnUmb.innerText = info.shortBtn;
+                this.showPrompt(info.message);
+            }
             if (e.code === 'KeyM') this.toggleModal('modal-mix', () => this.openMixModal());
             if (e.code === 'KeyU') this.toggleModal('modal-upgrade', () => this.openUpgradeModal());
             if (e.code === 'F9') { e.preventDefault(); this.toggleDevFishPanel(); }
@@ -1815,7 +1835,9 @@ export class UIManager {
             const itemsMap = {};
             this.shopItems.forEach(i => itemsMap[i.id] = i);
             const currentWeather = this.environment ? this.environment.weather : 'SUNNY';
-            const res = this.mixingSystem.mixBait(itemsMap, currentWeather, this.playerInventory);
+            const padLv = (this.equipmentLevels && this.equipmentLevels.baitPad) || 1;
+            const padCapacityMul = 1.0 + Math.max(0, padLv - 1) * 0.10; // Khay Lv.2 +10%, Lv.3 +20%, Lv.4 +30% giữ ẩm chống rơi vãi
+            const res = this.mixingSystem.mixBait(itemsMap, currentWeather, this.playerInventory, padCapacityMul);
             if (res.success) {
                 this.savePlayerProfile();
                 this.gameplay.activeHookBait = res.hookBait;
@@ -1823,10 +1845,12 @@ export class UIManager {
                 if (this.gameplay.updateBaitTrayVisuals) this.gameplay.updateBaitTrayVisuals();
                 soundManager.playWaterSplash(1.0);
                 this.closeMixModal();
+                const uHook = res.hookBait.unitLabel || 'viên mồi';
+                const uGround = res.groundBait.unitLabel || 'nắm xả';
                 const warnOverdose = res.analysis.isFlavorOverdose
                     ? ' ⚠️ CẢNH BÁO: Đang pha quá liều gây NẶNG MÙI — cá sẽ cày nhiều tăm và dễ đè phao!'
                     : ` ✨ ${res.analysis.ratioBadge}`;
-                this.showPrompt(`✅ Đã pha chế [${res.hookBait.name}] (${res.hookBait.charges} viên câu + ${res.groundBait.charges} nắm xả).${warnOverdose} 👉 Bấm F xả ổ trước rồi mới ra cần!`);
+                this.showPrompt(`✅ Đã vê lên khay [${res.hookBait.name}]: ${res.hookBait.charges} ${uHook} + ${res.groundBait.charges} ${uGround}.${warnOverdose} 👉 Bấm F xả ổ trước rồi mới ra cần!`);
             } else {
                 this.showScenarioToast('🥣 CHƯA THỂ PHA CHẾ', res.message, 'WARN');
             }
@@ -3650,6 +3674,8 @@ export class UIManager {
         const footSum = document.getElementById('mix-footer-summary');
 
         if (!res.valid) {
+            const yieldEl = document.getElementById('ana-yield-count');
+            if (yieldEl) yieldEl.innerText = 'Chưa đủ nguyên liệu để vê';
             const waterStatusEl = document.getElementById('ana-water-status');
             if (waterStatusEl) {
                 waterStatusEl.innerText = '⚠️ CHẬU CHƯA ĐỦ NGUYÊN LIỆU CHÍNH';
@@ -3664,6 +3690,17 @@ export class UIManager {
                 footSum.innerHTML = `<span style="color:#fca5a5;">⚠️ ${res.message}</span>`;
             }
             return;
+        }
+
+        const padLv = (this.equipmentLevels && this.equipmentLevels.baitPad) || 1;
+        const padCapacityMul = 1.0 + Math.max(0, padLv - 1) * 0.10;
+        const estHook = Math.round((res.estimatedHookCharges || 40) * padCapacityMul);
+        const estGround = Math.round((res.estimatedGroundCharges || 14) * padCapacityMul);
+        const uHook = res.unitHookLabel || 'viên mồi';
+        const uGround = res.unitGroundLabel || 'nắm xả';
+        const yieldEl = document.getElementById('ana-yield-count');
+        if (yieldEl) {
+            yieldEl.innerText = `${estHook} ${uHook} + ${estGround} ${uGround}${padLv > 1 ? ` (Pad Lv.${padLv} +${(padLv - 1) * 10}%)` : ''}`;
         }
 
         const waterStatusEl = document.getElementById('ana-water-status');
@@ -3718,7 +3755,7 @@ export class UIManager {
 
         if (footSum && curCal && curStyle) {
             const modeMeta = FISHING_MODES[res.fishingMode] || FISHING_MODES.CAM;
-            footSum.innerHTML = `${modeMeta.icon} <b>${res.ingredientSummary}</b> (${res.flavorSummary}) • <b style="color:${curStyle.color}">${curStyle.shortLabel}</b> • <b style="color:#fde047">${curCal.shortTag}</b>`;
+            footSum.innerHTML = `${modeMeta.icon} <b>${res.ingredientSummary}</b> (${res.flavorSummary}) • Vê được <b style="color:#6ee7b7">${estHook} ${uHook} + ${estGround} ${uGround}</b> • <b style="color:#fde047">${curCal.shortTag}</b>`;
         }
     }
 
@@ -3798,7 +3835,9 @@ export class UIManager {
             } else {
                 const hc = typeof hb.charges === 'number' ? hb.charges : '∞';
                 const gc = gb && typeof gb.charges === 'number' ? gb.charges : 0;
-                trayEl.innerText = `Khay: ${hc} viên • ${gc} nắm xả`;
+                const uH = hb.unitLabel || 'viên';
+                const uG = (gb && gb.unitLabel) || 'nắm xả';
+                trayEl.innerText = `Khay: ${hc} ${uH} • ${gc} ${uG}`;
                 trayEl.className = 'fish-mind-tag ' + (hc === 0 ? 'tag-danger' : 'tag-ok');
             }
         }
@@ -5233,8 +5272,17 @@ export class UIManager {
             if (flowBar) flowBar.style.display = isRodOut ? 'none' : 'flex';
 
             document.getElementById('seated-spot-name').innerText = `📍 ${this.gameplay.currentSpotName || 'Bến Câu Đài'}`;
-            const baitName = this.gameplay.activeHookBait ? this.gameplay.activeHookBait.name : 'Chưa gắn mồi';
-            document.getElementById('seated-bait-info').innerText = `Khay mồi: ${baitName}`;
+            const hbNow = this.gameplay.activeHookBait;
+            const gbNow = this.gameplay.activeGroundBait;
+            if (hbNow) {
+                const hc = typeof hbNow.charges === 'number' ? `${hbNow.charges}/${hbNow.maxCharges || hbNow.charges}` : '∞';
+                const gc = gbNow && typeof gbNow.charges === 'number' ? `${gbNow.charges}/${gbNow.maxCharges || gbNow.charges}` : '0';
+                const uH = hbNow.unitLabel || 'viên';
+                const uG = (gbNow && gbNow.unitLabel) || 'xả';
+                document.getElementById('seated-bait-info').innerText = `Khay: ${hbNow.name} (${hc} ${uH} • ${gc} ${uG})`;
+            } else {
+                document.getElementById('seated-bait-info').innerText = 'Khay mồi: Chưa gắn mồi (Bấm M pha mồi)';
+            }
 
             const castBtn = document.getElementById('btn-act-cast');
             if (this.gameplay.state === 'SEATED' || this.gameplay.state === 'LANDED') {

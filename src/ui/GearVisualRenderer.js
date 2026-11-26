@@ -259,14 +259,40 @@ export function renderEquipmentPreviewSVG(categoryKey, tier = {}) {
         const inCol = hexNumToCss(tier.innerColor, '#0284c7');
         const layers = tier.trayLayers || 1;
         return `
-        <svg viewBox="0 0 130 74" width="118" height="66" xmlns="http://www.w3.org/2000/svg">
-            ${layers >= 2 ? `<ellipse cx="92" cy="48" rx="26" ry="11" fill="#0f172a" stroke="${rimCol}" stroke-width="2"/><ellipse cx="92" cy="47" rx="20" ry="8" fill="#b45309"/>` : ''}
-            ${layers >= 3 ? `<ellipse cx="34" cy="50" rx="22" ry="9.5" fill="#1e293b" stroke="#e2e8f0" stroke-width="2"/>` : ''}
-            <ellipse cx="62" cy="30" rx="36" ry="15" fill="${inCol}" stroke="${rimCol}" stroke-width="3"/>
-            <circle cx="52" cy="28" r="4.5" fill="#d97706"/>
-            <circle cx="64" cy="31" r="4.5" fill="#d97706"/>
-            <circle cx="72" cy="26" r="4.5" fill="#eab308"/>
-            ${tier.hasCover ? `<path d="M 26 26 A 36 15 0 0 1 98 26" fill="none" stroke="#facc15" stroke-width="3.2"/>` : ''}
+        <svg viewBox="0 0 140 80" width="124" height="70" xmlns="http://www.w3.org/2000/svg">
+            <!-- Tay đòn & Trục xoay Inox CNC kẹp thùng -->
+            <line x1="18" y1="62" x2="62" y2="56" stroke="#cbd5e1" stroke-width="3.5" stroke-linecap="round"/>
+            <rect x="59" y="34" width="6" height="36" rx="2" fill="#e2e8f0"/>
+            <rect x="56" y="66" width="12" height="5" rx="2" fill="#0f172a"/>
+            <!-- Tầng 2: Khay mồi xả đầy ắp -->
+            ${layers >= 2 ? `
+                <ellipse cx="98" cy="54" rx="26" ry="11" fill="#0f172a" stroke="${rimCol}" stroke-width="2"/>
+                <ellipse cx="98" cy="52" rx="21" ry="8.5" fill="#b45309"/>
+                <circle cx="91" cy="51" r="1.8" fill="#fde047"/>
+                <circle cx="103" cy="53" r="1.8" fill="#fde047"/>
+                <circle cx="97" cy="49" r="1.8" fill="#fde047"/>
+            ` : ''}
+            <!-- Tầng 3: Khay bột tơ nhện Inox -->
+            ${layers >= 3 ? `
+                <ellipse cx="32" cy="54" rx="21" ry="9" fill="#cbd5e1" stroke="#f8fafc" stroke-width="1.8"/>
+                <ellipse cx="32" cy="53" rx="16" ry="6.5" fill="#fef9c3"/>
+            ` : ''}
+            <!-- Cốc nước trong suốt chấm tay vê mồi -->
+            <ellipse cx="116" cy="28" rx="10" ry="4.5" fill="rgba(56,189,248,0.45)" stroke="#e2e8f0" stroke-width="1.6"/>
+            <path d="M 106 28 L 108 40 C 109 43, 123 43, 124 40 L 126 28" fill="rgba(56,189,248,0.35)" stroke="#bae6fd" stroke-width="1.2"/>
+            <!-- Đĩa từ tầng 1 + Tâm nam châm + 10 viên mồi vê tròn đồng tâm -->
+            <ellipse cx="62" cy="28" rx="37" ry="15.5" fill="${inCol}" stroke="${rimCol}" stroke-width="3"/>
+            <ellipse cx="62" cy="28" rx="10" ry="4.2" fill="#e2e8f0" stroke="#94a3b8" stroke-width="1"/>
+            <circle cx="42" cy="26" r="3.8" fill="#d97706"/>
+            <circle cx="48" cy="33" r="3.8" fill="#ea580c"/>
+            <circle cx="58" cy="36" r="3.8" fill="#d97706"/>
+            <circle cx="70" cy="35" r="3.8" fill="#eab308"/>
+            <circle cx="80" cy="31" r="3.8" fill="#d97706"/>
+            <circle cx="82" cy="24" r="3.8" fill="#ea580c"/>
+            <circle cx="72" cy="19" r="3.8" fill="#eab308"/>
+            <circle cx="58" cy="18" r="3.8" fill="#d97706"/>
+            <circle cx="46" cy="20" r="3.8" fill="#eab308"/>
+            ${tier.hasCover ? `<path d="M 25 25 A 37 15.5 0 0 1 99 25" fill="none" stroke="#facc15" stroke-width="3.5"/>` : ''}
         </svg>`;
     }
     if (categoryKey === 'box') {
@@ -280,21 +306,37 @@ export function renderEquipmentPreviewSVG(categoryKey, tier = {}) {
                 <ellipse cx="24" cy="76" rx="6" ry="2.2" fill="${accCol}"/>
                 <ellipse cx="96" cy="76" rx="6" ry="2.2" fill="${accCol}"/>
             ` : ''}
-            <!-- Thân thùng câu 36L + Đệm ngồi êm + Pat gác cần -->
+            <!-- Thân thùng câu 36L + Đệm ngồi EVA 3 múi + Tựa lưng + Khóa Inox -->
+            <rect x="34" y="6" width="52" height="10" rx="2.5" fill="${accCol}" opacity="0.9"/>
             <rect x="26" y="26" width="68" height="40" rx="5" fill="${boxCol}" stroke="#94a3b8" stroke-width="1.5"/>
             <rect x="24" y="19" width="72" height="9" rx="3" fill="${accCol}"/>
-            <rect x="34" y="14" width="52" height="5" rx="2" fill="#0f172a"/>
-            <rect x="48" y="36" width="24" height="8" rx="2" fill="${accCol}" opacity="0.85"/>
+            <rect x="31" y="14" width="18" height="5" rx="1.5" fill="#0f172a"/>
+            <rect x="51" y="14" width="18" height="5" rx="1.5" fill="#0f172a"/>
+            <rect x="71" y="14" width="18" height="5" rx="1.5" fill="#0f172a"/>
+            <rect x="38" y="34" width="7" height="11" rx="1.5" fill="#e2e8f0"/>
+            <rect x="75" y="34" width="7" height="11" rx="1.5" fill="#e2e8f0"/>
         </svg>`;
     }
-    // umbrella
+    // umbrella: Ô câu đài vòm cong Parabol 12 nan + Diềm rủ + Khớp lò xo bẻ nghiêng cổ ô
     const canCol = hexNumToCss(tier.canopyColor, '#0284c7');
     const trimCol = hexNumToCss(tier.trimColor, '#facc15');
     return `
-    <svg viewBox="0 0 120 86" width="106" height="76" xmlns="http://www.w3.org/2000/svg">
-        <line x1="60" y1="14" x2="60" y2="80" stroke="#e2e8f0" stroke-width="3"/>
-        <path d="M 12 42 Q 60 10, 108 42 Z" fill="${canCol}" stroke="${trimCol}" stroke-width="2"/>
-        ${tier.doubleLayer ? `<path d="M 34 25 Q 60 6, 86 25 Z" fill="${trimCol}" stroke="#ffffff" stroke-width="1"/>` : ''}
+    <svg viewBox="0 0 130 90" width="112" height="78" xmlns="http://www.w3.org/2000/svg">
+        <!-- Trục hợp kim + Khớp lò xo nghiêng cổ ô -->
+        <line x1="65" y1="38" x2="65" y2="85" stroke="#e2e8f0" stroke-width="3.2" stroke-linecap="round"/>
+        <rect x="62" y="54" width="6" height="9" rx="2" fill="#f59e0b"/>
+        <!-- Nan chống dưới vòm -->
+        <line x1="65" y1="48" x2="36" y2="36" stroke="#94a3b8" stroke-width="1.3"/>
+        <line x1="65" y1="48" x2="94" y2="36" stroke="#94a3b8" stroke-width="1.3"/>
+        <!-- Vòm ô Parabol + Nan múi + Diềm rủ uốn lượn -->
+        <path d="M 12 40 C 26 13, 104 13, 118 40 L 118 46 L 12 46 Z" fill="${canCol}" stroke="${trimCol}" stroke-width="1.8"/>
+        <path d="M 65 14 Q 44 24, 34 45" fill="none" stroke="rgba(255,255,255,0.28)" stroke-width="1.1"/>
+        <path d="M 65 14 Q 86 24, 96 45" fill="none" stroke="rgba(255,255,255,0.28)" stroke-width="1.1"/>
+        <line x1="65" y1="14" x2="65" y2="45" stroke="rgba(255,255,255,0.32)" stroke-width="1.1"/>
+        <line x1="12" y1="45" x2="118" y2="45" stroke="${trimCol}" stroke-width="2.4"/>
+        ${tier.doubleLayer ? `<path d="M 38 24 C 48 10, 82 10, 92 24 Z" fill="${trimCol}" stroke="#ffffff" stroke-width="1"/>` : ''}
+        <!-- Chóp thu lôi trên đỉnh ô -->
+        <polygon points="62,14 68,14 65,6" fill="${trimCol}"/>
     </svg>`;
 }
 

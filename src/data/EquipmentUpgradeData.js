@@ -290,31 +290,31 @@ export const EQUIPMENT_CATEGORIES = [
         tiers: [
             {
                 level: 1,
-                name: 'Khay Mồi Nhựa 1 Tầng',
+                name: 'Khay Mồi Kẹp Pat + Cốc Nước Chấm Tay',
                 tierTag: 'Phổ Thông',
                 price: 0,
                 trayLayers: 1,
-                rimColor: 0x64748b,
-                innerColor: 0x334155,
-                towelColor: 0x94a3b8,
+                rimColor: 0x94a3b8,
+                innerColor: 0x1e3a8a,
+                towelColor: 0x38bdf8,
                 attractionBonus: 1.0,
-                desc: 'Khay nhựa đơn 1 tầng gọn nhẹ, đủ để vài viên mồi vê cơ bản.'
+                desc: 'Khay mồi tròn gắn pat inox có đĩa nam châm hút lưỡi, cốc nước nhúng tay vê mồi & khăn lau.'
             },
             {
                 level: 2,
-                name: 'Pad Từ Tính 2 Tầng Xanh Ngọc',
+                name: 'Pad Từ Tính 2 Tầng Xanh Ngọc (+10% Mồi Vê)',
                 tierTag: 'Cao Cấp',
                 price: 320000,
                 trayLayers: 2,
-                rimColor: 0x94a3b8,
+                rimColor: 0xcbd5e1,
                 innerColor: 0x0284c7,
                 towelColor: 0x38bdf8,
                 attractionBonus: 1.12,
-                desc: 'Khay từ tính 2 tầng tách biệt mồi xả & mồi vê, hút cá tụ ổ nhanh hơn 12%.'
+                desc: 'Khay từ tính xoay 2 tầng tách biệt mồi câu & mồi xả, giữ ẩm vê thêm +10% viên mồi & tụ ổ nhanh +12%.'
             },
             {
                 level: 3,
-                name: 'Pad Inox 3 Tầng Vuốt Mồi Pro',
+                name: 'Pad Inox CNC 3 Tầng Vuốt Mồi Pro (+20% Mồi Vê)',
                 tierTag: 'Thi Đấu Pro',
                 price: 680000,
                 trayLayers: 3,
@@ -322,11 +322,11 @@ export const EQUIPMENT_CATEGORIES = [
                 innerColor: 0x059669,
                 towelColor: 0x34d399,
                 attractionBonus: 1.24,
-                desc: 'Bộ 3 tầng inox sáng bóng + đĩa vuốt nam châm lớn, giữ mồi thơm lâu & tăng 24% tốc độ tụ ổ.'
+                desc: 'Bộ 3 tầng inox CNC + khay bột tơ nhện, chống khô cám vê thêm +20% viên mồi & tăng +24% tốc độ tụ ổ.'
             },
             {
                 level: 4,
-                name: 'Pad Carbon Đấu Giải Full Phụ Kiện',
+                name: 'Pad Carbon Đấu Giải Vành Chắn Nắng (+30% Mồi Vê)',
                 tierTag: 'Huyền Thoại',
                 price: 1250000,
                 trayLayers: 3,
@@ -335,7 +335,7 @@ export const EQUIPMENT_CATEGORIES = [
                 innerColor: 0x0f172a,
                 towelColor: 0xf59e0b,
                 attractionBonus: 1.38,
-                desc: 'Pad carbon mạ vàng 3 tầng có vành chắn gió & khay phụ, giữ mùi tối đa, tăng 38% hiệu lực tụ ổ!'
+                desc: 'Pad carbon mạ vàng 3 tầng có vành chắn nắng gió chống bay hơi, vê thêm +30% lượng mồi & +38% tụ ổ!'
             }
         ]
     },
@@ -399,51 +399,55 @@ export const EQUIPMENT_CATEGORIES = [
         tiers: [
             {
                 level: 1,
-                name: 'Chưa Có Ô (Đội Nón Thường)',
+                name: 'Ô Bạt Xanh Phổ Thông 1.8m (Bấm O Nghiêng/Gập)',
                 tierTag: 'Phổ Thông',
                 price: 0,
-                visible: false,
-                canopyColor: 0x0284c7,
-                trimColor: 0xfacc15,
+                visible: true,
+                canopyScale: 0.88,
+                canopyColor: 0x0369a1,
+                trimColor: 0xbae6fd,
                 doubleLayer: false,
-                weatherShield: 0.0,
-                desc: 'Ngồi phơi nắng/mưa trực tiếp ngoài trời, phao dễ bị ảnh hưởng khi gió lớn hoặc mưa rào.'
+                weatherShield: 0.15,
+                desc: 'Ô che nắng cơ bản 1.8m 12 nan sắt có khớp lò xo nghiêng cổ ô (Phím O), giảm 15% chói nắng mặt nước.'
             },
             {
                 level: 2,
-                name: 'Ô Câu Đài 1 Tầng 2.2m Xanh Biển',
+                name: 'Ô Câu Đài Phủ Bạc UV 2.2m Xanh Ngọc',
                 tierTag: 'Cao Cấp',
                 price: 350000,
                 visible: true,
+                canopyScale: 1.0,
                 canopyColor: 0x0284c7,
-                trimColor: 0xe0f2fe,
+                trimColor: 0xfef08a,
                 doubleLayer: false,
-                weatherShield: 0.35,
-                desc: 'Tán ô rộng 2.2m che nắng dịu mắt nhìn phao rõ hơn, giảm 35% ảnh hưởng sóng gió lên phao.'
+                weatherShield: 0.38,
+                desc: 'Tán ô vòm cong 2.2m tráng bạc chống tia UV có diềm rủ che nắng xiên, giảm 38% sóng gió lên phao.'
             },
             {
                 level: 3,
-                name: 'Ô 2 Tầng Thoáng Gió 2.4m Chống UV',
+                name: 'Ô 2 Tầng Thoáng Gió 2.4m Nan Thủy Tinh',
                 tierTag: 'Thi Đấu Pro',
                 price: 760000,
                 visible: true,
+                canopyScale: 1.08,
                 canopyColor: 0x065f46,
                 trimColor: 0x34d399,
                 doubleLayer: true,
-                weatherShield: 0.65,
-                desc: 'Thiết kế 2 tầng thoát gió thông minh chống lật ô, giảm 65% rung lắc phao khi trời đổ mưa gió.'
+                weatherShield: 0.68,
+                desc: 'Thiết kế 2 tầng thoát gió thông minh 12 nan sợi thủy tinh kép chống lật ô, giảm 68% rung lắc thời tiết.'
             },
             {
                 level: 4,
-                name: 'Ô Đấu Giải Chống Bão 2.6m Đen Vàng',
+                name: 'Ô Đấu Giải Chống Bão 2.6m Đen Vàng Hoàng Kim',
                 tierTag: 'Huyền Thoại',
                 price: 1350000,
                 visible: true,
+                canopyScale: 1.16,
                 canopyColor: 0x111827,
                 trimColor: 0xfacc15,
                 doubleLayer: true,
-                weatherShield: 0.90,
-                desc: 'Ô câu đài cao cấp nhất nan sợi thủy tinh siêu cứng viền vàng kim, giảm 90% ảnh hưởng thời tiết xấu!'
+                weatherShield: 0.92,
+                desc: 'Ô đại sư 2.6m phủ Vinyl đen chống nóng tuyệt đối, nan kép carbon viền vàng kim, giảm 92% mưa bão!'
             }
         ]
     }

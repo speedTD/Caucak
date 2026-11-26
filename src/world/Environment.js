@@ -1928,8 +1928,29 @@ export class Environment {
         const keepnetMat = new THREE.MeshBasicMaterial({ color: 0x0284c7, wireframe: true, transparent: true, opacity: 0.55 });
         const frameMat = new THREE.MeshStandardMaterial({ color: 0x64748b, metalness: 0.85, roughness: 0.25 });
         const rubberMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.95 });
+        const inoxPoleMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.9, roughness: 0.18 });
 
-        this.fishingSpots.forEach((spot) => {
+        // Geometry dùng chung cho Ô Câu Đài Vòm Parabol 12 Múi cắm dọc các bến hồ dịch vụ (tối ưu hiệu năng 60 FPS!)
+        const pierUmbPts = [];
+        for (let s = 0; s <= 10; s++) {
+            const u = s / 10;
+            pierUmbPts.push(new THREE.Vector2(u * 1.32, 0.36 * (1.0 - Math.pow(u, 1.7))));
+        }
+        const sharedUmbDomeGeo = new THREE.LatheGeometry(pierUmbPts, 12);
+        const sharedUmbValanceGeo = new THREE.CylinderGeometry(1.32, 1.34, 0.08, 12, 1, true);
+        const sharedVentGeo = new THREE.ConeGeometry(0.62, 0.18, 12, 1, true);
+        const umbPalette = [
+            { main: 0x0284c7, trim: 0xfef08a },
+            { main: 0x065f46, trim: 0x34d399 },
+            { main: 0x111827, trim: 0xfacc15 },
+            { main: 0x1d4ed8, trim: 0xbae6fd }
+        ];
+        const umbMats = umbPalette.map((p) => ({
+            main: new THREE.MeshStandardMaterial({ color: p.main, roughness: 0.48, metalness: 0.15, side: THREE.DoubleSide }),
+            trim: new THREE.MeshStandardMaterial({ color: p.trim, roughness: 0.28, metalness: 0.65, side: THREE.DoubleSide })
+        }));
+
+        this.fishingSpots.forEach((spot, spotIdx) => {
             const pierGroup = new THREE.Group();
 
             // 1. SÀN BÊ TÔNG ĐÀI THỦ ĐỔ MẺ KIÊN CỐ (Rộng 3.8m x Dài 5.6m, có khe co giãn)
@@ -1980,10 +2001,41 @@ export class Environment {
             keepnet.position.set(-1.35, -0.15, 2.2);
             pierGroup.add(keepnet);
 
-            // Cọc biển số Ô Câu Đài
+            // Cọc biển số Ô Câu Đài + Khớp cắm Ô Che Nắng Chuyên Nghiệp trên mỗi bến
             const signPost = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.3, 6), postMat);
             signPost.position.set(1.65, 0.85, -1.8);
             pierGroup.add(signPost);
+
+            // Trang bị Ô Câu Đài 2 Tầng Vòm Parabol nghiêng chắn nắng tại các bến quanh hồ tạo khung cảnh hồ dịch vụ cực thực tế!
+            if (spotIdx % 2 === 1) {
+                const pal = umbMats[spotIdx % umbMats.length];
+                const pierUmb = new THREE.Group();
+
+                const uPole = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.026, 2.35, 10), inoxPoleMat);
+                uPole.position.set(0, 1.48, 0);
+                pierUmb.add(uPole);
+
+                const uHead = new THREE.Group();
+                uHead.position.set(0, 2.36, 0);
+                uHead.rotation.x = 0.16; // Hơi nghiêng cổ ô chắn nắng mặt nước
+                uHead.rotation.z = (spotIdx % 4 === 1) ? -0.10 : 0.10;
+
+                const dome = new THREE.Mesh(sharedUmbDomeGeo, pal.main);
+                dome.castShadow = true;
+                uHead.add(dome);
+
+                const valance = new THREE.Mesh(sharedUmbValanceGeo, pal.main);
+                valance.position.y = -0.04;
+                uHead.add(valance);
+
+                const ventTop = new THREE.Mesh(sharedVentGeo, pal.trim);
+                ventTop.position.y = 0.34;
+                uHead.add(ventTop);
+
+                pierUmb.add(uHead);
+                pierUmb.position.set(-1.25, 0, 0.35);
+                pierGroup.add(pierUmb);
+            }
 
             // Vòng định vị phát sáng nhẹ trên mặt sàn
             const ring = new THREE.Mesh(

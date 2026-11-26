@@ -207,94 +207,250 @@ export class FishingGameplay {
     initFPVViewmodel() {
         this.fpvRig.visible = false;
 
-        // 1. KHAY / PAD ĐỰNG MỒI TỪ TÍNH ĐA TẦNG (NÂNG CẤP TỪ 1 TẦNG -> 2 TẦNG -> 3 TẦNG + CHẮN GIÓ CARBON)
+        // 1. BỘ KHAY / PAD MỒI TỪ TÍNH ĐA TẦNG CNC + CỐC NƯỚC CHẤM TAY + ĐĨA NAM CHÂM HÚT LƯỠI + 16 VIÊN MỒI 3D ĐA HÌNH THÁI
         this.baitTray = new THREE.Group();
-        this.baitTrayRimMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.9, roughness: 0.15 });
-        const rim = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.18, 0.17, 0.025, 28),
+        const cncInoxMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.94, roughness: 0.14 });
+        const darkCarbonMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.55, roughness: 0.32 });
+
+        // Tay đòn pat kẹp inox nối từ hông Thùng Câu Đài sang trục xoay bộ Khay Mồi
+        const mountArm = new THREE.Mesh(new THREE.CylinderGeometry(0.0075, 0.0075, 0.24, 10), cncInoxMat);
+        mountArm.rotation.z = Math.PI / 2.15;
+        mountArm.position.set(-0.14, -0.065, 0.03);
+        this.baitTray.add(mountArm);
+
+        const centerShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.0095, 0.011, 0.14, 12), cncInoxMat);
+        centerShaft.position.set(0, -0.052, 0);
+        this.baitTray.add(centerShaft);
+
+        const knobNut = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.018, 8), darkCarbonMat);
+        knobNut.position.set(0, -0.095, 0);
+        this.baitTray.add(knobNut);
+
+        // Đĩa mồi câu chính (Tầng 1): Thành bo viền vát CNC + Lòng đĩa từ + Tâm nam châm tròn hút lưỡi câu
+        this.baitTrayRimMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.92, roughness: 0.14 });
+        const rimRing = new THREE.Mesh(
+            new THREE.TorusGeometry(0.172, 0.0125, 12, 36),
             this.baitTrayRimMat
         );
-        this.baitTray.add(rim);
+        rimRing.rotation.x = Math.PI / 2;
+        rimRing.position.y = 0.012;
+        this.baitTray.add(rimRing);
 
-        this.baitTrayInnerMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.25, metalness: 0.4 });
-        const inner = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.165, 0.165, 0.028, 28),
+        const trayBase = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.174, 0.162, 0.018, 36),
+            this.baitTrayRimMat
+        );
+        trayBase.position.y = -0.002;
+        this.baitTray.add(trayBase);
+
+        this.baitTrayInnerMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.26, metalness: 0.38 });
+        const innerDisc = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.164, 0.164, 0.012, 36),
             this.baitTrayInnerMat
         );
-        this.baitTray.add(inner);
+        innerDisc.position.y = 0.006;
+        this.baitTray.add(innerDisc);
 
-        // Khay mồi tầng 2 đựng bột mồi xả tơi (hiện từ Lv.2 trở lên)
-        this.baitTrayLowerBowl = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.135, 0.12, 0.032, 24),
-            new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.35, metalness: 0.5 })
+        // Đĩa nam châm Inox sáng bóng ở tâm khay để hút đôi lưỡi câu dự phòng
+        const magnetCore = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.044, 0.044, 0.004, 24),
+            cncInoxMat
         );
-        this.baitTrayLowerBowl.position.set(0.08, -0.045, 0.06);
+        magnetCore.position.set(0, 0.013, 0);
+        this.baitTray.add(magnetCore);
+
+        const hookGoldMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.95, roughness: 0.12 });
+        [-1, 1].forEach((s) => {
+            const spareHook = new THREE.Mesh(new THREE.TorusGeometry(0.009, 0.0016, 6, 14, Math.PI * 1.35), hookGoldMat);
+            spareHook.rotation.x = Math.PI / 2;
+            spareHook.rotation.z = s * 0.6;
+            spareHook.position.set(s * 0.014, 0.016, s * 0.006);
+            this.baitTray.add(spareHook);
+        });
+
+        // CỐC NƯỚC TRONG SUỐT CHẤM TAY VÊ MỒI (Gắn rìa phải khay mồi — chi tiết chuẩn cần thủ câu đài!)
+        const waterCupGroup = new THREE.Group();
+        const cupHolderRing = new THREE.Mesh(new THREE.TorusGeometry(0.042, 0.004, 8, 20), cncInoxMat);
+        cupHolderRing.rotation.x = Math.PI / 2;
+        cupHolderRing.position.y = 0.012;
+        waterCupGroup.add(cupHolderRing);
+
+        const cupGlass = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.040, 0.032, 0.052, 20, 1, true),
+            new THREE.MeshPhysicalMaterial({
+                color: 0xe0f2fe,
+                transparent: true,
+                opacity: 0.42,
+                roughness: 0.08,
+                clearcoat: 1.0,
+                side: THREE.DoubleSide
+            })
+        );
+        cupGlass.position.y = -0.006;
+        waterCupGroup.add(cupGlass);
+
+        const cupWater = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.037, 0.031, 0.034, 20),
+            new THREE.MeshPhysicalMaterial({
+                color: 0x38bdf8,
+                transparent: true,
+                opacity: 0.68,
+                roughness: 0.05
+            })
+        );
+        cupWater.position.y = -0.011;
+        waterCupGroup.add(cupWater);
+        waterCupGroup.position.set(0.205, 0.006, -0.035);
+        this.baitTray.add(waterCupGroup);
+
+        // Khay mồi xả (Tô mồi xả xoay lệch bên phải — luôn hiển thị trực quan lượng mồi xả ổ còn lại!)
+        this.baitTrayLowerBowl = new THREE.Group();
+        const lowerBowlShell = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.138, 0.116, 0.044, 28),
+            darkCarbonMat
+        );
+        this.baitTrayLowerBowl.add(lowerBowlShell);
+        const lowerBowlRim = new THREE.Mesh(
+            new THREE.TorusGeometry(0.138, 0.0065, 8, 28),
+            cncInoxMat
+        );
+        lowerBowlRim.rotation.x = Math.PI / 2;
+        lowerBowlRim.position.y = 0.021;
+        this.baitTrayLowerBowl.add(lowerBowlRim);
+        this.baitTrayLowerBowl.position.set(0.135, -0.042, 0.115);
         this.baitTray.add(this.baitTrayLowerBowl);
 
-        // Khay mồi tầng 3 inox vuốt mồi chuyên nghiệp (hiện từ Lv.3 trở lên)
-        this.baitTrayThirdBowl = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.11, 0.10, 0.026, 24),
-            new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.85, roughness: 0.18 })
+        // Ụ mồi xả tơi phồng 3D (có hạt ngô / ốc lấm tấm trên mặt, vơi dần chiều cao khi bấm F xả ổ!)
+        this.crumbMoundMat = new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.92 });
+        const crumbMound = new THREE.Group();
+        const moundCore = new THREE.Mesh(
+            new THREE.SphereGeometry(0.124, 22, 14, 0, Math.PI * 2, 0, Math.PI * 0.52),
+            this.crumbMoundMat
         );
-        this.baitTrayThirdBowl.position.set(-0.11, -0.04, 0.09);
+        moundCore.scale.set(1.0, 0.34, 1.0);
+        crumbMound.add(moundCore);
+
+        this.crumbGrainMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.45 });
+        this.crumbGrains = [];
+        for (let g = 0; g < 10; g++) {
+            const ang = (g / 10) * Math.PI * 2 + (g % 2) * 0.25;
+            const rad = 0.032 + (g % 3) * 0.028;
+            const grain = new THREE.Mesh(new THREE.SphereGeometry(0.0095, 8, 8), this.crumbGrainMat);
+            grain.scale.set(1.15, 0.75, 0.95);
+            grain.position.set(Math.cos(ang) * rad, 0.028 - rad * 0.12, Math.sin(ang) * rad);
+            crumbMound.add(grain);
+            this.crumbGrains.push(grain);
+        }
+        crumbMound.position.set(0, 0.008, 0);
+        crumbMound.visible = false;
+        this.crumbSurfaceMesh = crumbMound;
+        this.baitTrayLowerBowl.add(crumbMound);
+
+        // Khay mồi tầng 3 Inox đựng bột tơ nhện / mồi vuốt (hiện từ Lv.3 trở lên)
+        this.baitTrayThirdBowl = new THREE.Group();
+        const thirdShell = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.105, 0.092, 0.028, 24),
+            cncInoxMat
+        );
+        this.baitTrayThirdBowl.add(thirdShell);
+        const glutenPowder = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.096, 0.096, 0.008, 24),
+            new THREE.MeshStandardMaterial({ color: 0xfefce8, roughness: 0.95 })
+        );
+        glutenPowder.position.y = 0.012;
+        this.baitTrayThirdBowl.add(glutenPowder);
+        this.baitTrayThirdBowl.position.set(-0.145, -0.038, 0.115);
         this.baitTrayThirdBowl.visible = false;
         this.baitTray.add(this.baitTrayThirdBowl);
 
-        // Vành chắn gió & chụp mồi VIP (hiện ở Lv.4)
-        this.baitTrayCover = new THREE.Mesh(
-            new THREE.TorusGeometry(0.182, 0.012, 10, 28, Math.PI * 1.2),
-            new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.9, roughness: 0.15 })
+        // Vành chắn nắng & cản gió Carbon mạ vàng VIP (hiện ở Lv.4)
+        this.baitTrayCover = new THREE.Group();
+        const goldHoodRim = new THREE.Mesh(
+            new THREE.TorusGeometry(0.180, 0.008, 10, 32, Math.PI * 1.18),
+            new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.92, roughness: 0.14 })
         );
-        this.baitTrayCover.rotation.x = Math.PI / 2;
-        this.baitTrayCover.rotation.z = -0.3;
-        this.baitTrayCover.position.set(0, 0.022, 0);
+        goldHoodRim.rotation.x = Math.PI / 2;
+        goldHoodRim.rotation.z = -0.35;
+        goldHoodRim.position.y = 0.048;
+        this.baitTrayCover.add(goldHoodRim);
+
+        const windShieldWall = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.180, 0.176, 0.042, 28, 1, true, -0.35, Math.PI * 1.18),
+            new THREE.MeshStandardMaterial({ color: 0x111827, metalness: 0.65, roughness: 0.25, side: THREE.DoubleSide })
+        );
+        windShieldWall.position.y = 0.028;
+        this.baitTrayCover.add(windShieldWall);
         this.baitTrayCover.visible = false;
         this.baitTray.add(this.baitTrayCover);
 
-        const crumbSurface = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.125, 0.125, 0.012, 24),
-            new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.95 })
-        );
-        crumbSurface.position.set(0.08, -0.028, 0.06);
-        crumbSurface.visible = false; // Ẩn mồi xả cho đến khi người chơi thực sự pha mồi
-        this.crumbSurfaceMesh = crumbSurface;
-        this.baitTray.add(crumbSurface);
-
-        // 4 viên mồi câu vê tròn trên đĩa từ (Chỉ hiện khi đã pha mồi và giảm dần khi vê mồi ra cần)
+        // 16 VIÊN MỒI CÂU 3D XẾP ĐỒNG TÂM TRÊN ĐĨA TỪ (Tự đổi hình thái Cám Vê / Ốc Xoắn / Hạt Ngô Vàng & vơi dần theo từng nhát câu!)
         this.baitTrayBalls = [];
-        const ballCoords = [
-            [-0.048, 0.026, 0.022],
-            [0.028, 0.026, 0.022],
-            [-0.022, 0.026, -0.042],
-            [0.048, 0.026, -0.036]
-        ];
-        for (let i = 0; i < ballCoords.length; i++) {
-            const bBall = new THREE.Mesh(
-                new THREE.SphereGeometry(0.025, 14, 14),
-                new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.85 })
-            );
-            bBall.position.set(ballCoords[i][0], ballCoords[i][1], ballCoords[i][2]);
-            bBall.visible = false;
-            this.baitTrayBalls.push(bBall);
-            this.baitTray.add(bBall);
+        this.baitBallPrimaryMat = new THREE.MeshPhysicalMaterial({ color: 0xd97706, roughness: 0.72, clearcoat: 0.15 });
+        this.baitBallAccentMat = new THREE.MeshPhysicalMaterial({ color: 0x92400e, roughness: 0.55, clearcoat: 0.35 });
+
+        const ringPositions = [];
+        // Vòng trong 6 viên quanh đĩa nam châm
+        for (let i = 0; i < 6; i++) {
+            const a = (i / 6) * Math.PI * 2 + 0.2;
+            ringPositions.push([Math.cos(a) * 0.076, 0.022, Math.sin(a) * 0.076, a]);
+        }
+        // Vòng ngoài 10 viên sát thành khay
+        for (let i = 0; i < 10; i++) {
+            const a = (i / 10) * Math.PI * 2;
+            ringPositions.push([Math.cos(a) * 0.126, 0.022, Math.sin(a) * 0.126, a]);
         }
 
-        // Khăn lau tay cần thủ vắt cạnh khay mồi
-        this.baitTowelMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.9 });
-        const towel = new THREE.Mesh(
-            new THREE.BoxGeometry(0.09, 0.014, 0.14),
-            this.baitTowelMat
-        );
-        towel.position.set(-0.11, 0.016, -0.04);
-        towel.rotation.y = 0.25;
-        this.baitTray.add(towel);
+        const unitSphereGeo = new THREE.SphereGeometry(0.0175, 12, 10);
+        const snailSpireGeo = new THREE.ConeGeometry(0.0125, 0.022, 9);
+        for (let i = 0; i < ringPositions.length; i++) {
+            const [bx, by, bz, bang] = ringPositions[i];
+            const itemGrp = new THREE.Group();
+            const mainPiece = new THREE.Mesh(unitSphereGeo, this.baitBallPrimaryMat);
+            itemGrp.add(mainPiece);
 
-        this.baitTray.position.set(-0.36, -0.33, -0.65);
-        this.baitTray.rotation.x = Math.PI / 4.5;
-        this.baitTray.rotation.z = Math.PI / 12;
+            // Chóp xoắn vỏ ốc (chỉ bật khi chọn Câu Ốc!)
+            const snailTip = new THREE.Mesh(snailSpireGeo, this.baitBallAccentMat);
+            snailTip.position.set(0.006, 0.010, 0.004);
+            snailTip.rotation.z = -0.55;
+            snailTip.visible = false;
+            itemGrp.add(snailTip);
+
+            itemGrp.position.set(bx, by, bz);
+            itemGrp.rotation.y = bang * 1.7;
+            itemGrp.visible = false;
+            itemGrp.userData = { mainPiece, snailTip, baseY: by, idx: i };
+            this.baitTrayBalls.push(itemGrp);
+            this.baitTray.add(itemGrp);
+        }
+
+        // Khăn lau tay cần thủ mềm mại vắt qua thanh treo Inox bên trái khay (thay khối hộp thô cứng cũ!)
+        const towelBar = new THREE.Mesh(new THREE.CylinderGeometry(0.0035, 0.0035, 0.12, 8), cncInoxMat);
+        towelBar.rotation.x = Math.PI / 2;
+        towelBar.position.set(-0.188, 0.004, -0.03);
+        this.baitTray.add(towelBar);
+
+        this.baitTowelMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.88, side: THREE.DoubleSide });
+        const towelTop = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.105, 10, 1, false, 0, Math.PI), this.baitTowelMat);
+        towelTop.rotation.x = Math.PI / 2;
+        towelTop.position.set(-0.188, 0.006, -0.03);
+        this.baitTray.add(towelTop);
+
+        const towelDrape1 = new THREE.Mesh(new THREE.BoxGeometry(0.006, 0.11, 0.102), this.baitTowelMat);
+        towelDrape1.position.set(-0.194, -0.048, -0.03);
+        towelDrape1.rotation.z = 0.08;
+        this.baitTray.add(towelDrape1);
+
+        const towelDrape2 = new THREE.Mesh(new THREE.BoxGeometry(0.006, 0.095, 0.098), this.baitTowelMat);
+        towelDrape2.position.set(-0.182, -0.042, -0.028);
+        towelDrape2.rotation.z = -0.06;
+        this.baitTray.add(towelDrape2);
+
+        this.baitTray.position.set(-0.35, -0.32, -0.66);
+        this.baitTray.rotation.x = Math.PI / 4.8;
+        this.baitTray.rotation.z = Math.PI / 14;
         this.fpvRig.add(this.baitTray);
 
-        // 2. CÂY GÁC CẦN ĐÀI CARBON + NGÀM CON LĂN SILICON ĐÔI SỪNG HƯƠU + MIỆNG RỌNG CÁ
+        // 2. CÂY GÁC CẦN ĐÀI CARBON + NGÀM CON LĂN SILICON ĐÔI SỪNG HƯƠU + RỌNG CÁ ĐA ĐAI NỔI
         this.rodRestSupport = new THREE.Group();
 
         // Ngàm đỡ hợp kim nhôm CNC + 2 con lăn silicon mềm chống xước lóng cần
@@ -333,7 +489,7 @@ export class FishingGameplay {
         const brassJointMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.92, roughness: 0.18 });
         const stemSupport = new THREE.Mesh(
             new THREE.CylinderGeometry(0.0065, 0.0085, 0.16, 12),
-            new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.92, roughness: 0.12 })
+            cncInoxMat
         );
         stemSupport.position.set(0.15, -0.15, -1.18);
         this.rodRestSupport.add(stemSupport);
@@ -357,28 +513,55 @@ export class FishingGameplay {
         boomCollar.position.set(0.15, -0.29, -0.92);
         this.rodRestSupport.add(boomCollar);
 
-        // 2B. THÙNG CÂU ĐÀI 3D (Nằm gọn mép dưới góc trái FPV khi ngồi bến, nâng cấp từ ghế xếp -> thùng 36L VIP)
+        // 2B. THÙNG CÂU ĐÀI 3D CHUYÊN NGHIỆP (Có Đệm Mút EVA Êm Ái, Tựa Lưng, Khóa Gài Inox & 4 Chân Địa Hình Có Bát Chống Lún)
         this.fishingBoxGroup = new THREE.Group();
-        this.fishingBoxBodyMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.35, metalness: 0.35 });
-        this.fishingBoxAccentMat = new THREE.MeshStandardMaterial({ color: 0x64748b, metalness: 0.85, roughness: 0.2 });
+        this.fishingBoxBodyMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.32, metalness: 0.38 });
+        this.fishingBoxAccentMat = new THREE.MeshStandardMaterial({ color: 0x64748b, metalness: 0.85, roughness: 0.20 });
 
-        const boxBody = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.22, 0.24), this.fishingBoxBodyMat);
+        const boxBody = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.23, 0.25), this.fishingBoxBodyMat);
         this.fishingBoxGroup.add(boxBody);
 
-        const boxLid = new THREE.Mesh(new THREE.BoxGeometry(0.335, 0.032, 0.255), this.fishingBoxAccentMat);
-        boxLid.position.set(0, 0.12, 0);
+        const boxLid = new THREE.Mesh(new THREE.BoxGeometry(0.355, 0.032, 0.265), this.fishingBoxAccentMat);
+        boxLid.position.set(0, 0.125, 0);
         this.fishingBoxGroup.add(boxLid);
 
-        // 4 chân địa hình inox (hiện từ Lv.2 trở lên)
+        // Đệm mút ngồi EVA chia 3 múi chống mỏi lưng trên nắp thùng
+        const evaMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.78 });
+        for (let c = -1; c <= 1; c++) {
+            const cushionRib = new THREE.Mesh(new THREE.BoxGeometry(0.095, 0.018, 0.22), evaMat);
+            cushionRib.position.set(c * 0.102, 0.148, 0);
+            this.fishingBoxGroup.add(cushionRib);
+        }
+
+        // Tựa lưng gập phía sau thùng + Khóa lẫy Inox mặt trước + Pat kẹp phụ kiện bên hông
+        const backRest = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.12, 0.022), this.fishingBoxAccentMat);
+        backRest.position.set(0, 0.195, 0.122);
+        backRest.rotation.x = 0.18;
+        this.fishingBoxGroup.add(backRest);
+
+        for (const lx of [-0.09, 0.09]) {
+            const latch = new THREE.Mesh(new THREE.BoxGeometry(0.032, 0.055, 0.012), cncInoxMat);
+            latch.position.set(lx, 0.085, -0.128);
+            this.fishingBoxGroup.add(latch);
+        }
+
+        // 4 chân địa hình Inox rút cao thấp có bát xoay chống lún (hiện từ Lv.2 trở lên)
         this.fishingBoxLegs = new THREE.Group();
-        for (const lx of [-0.145, 0.145]) {
-            for (const lz of [-0.105, 0.105]) {
+        for (const lx of [-0.155, 0.155]) {
+            for (const lz of [-0.11, 0.11]) {
                 const leg = new THREE.Mesh(
-                    new THREE.CylinderGeometry(0.012, 0.012, 0.28, 8),
-                    new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.92, roughness: 0.15 })
+                    new THREE.CylinderGeometry(0.0125, 0.0125, 0.30, 10),
+                    cncInoxMat
                 );
-                leg.position.set(lx, -0.04, lz);
+                leg.position.set(lx, -0.045, lz);
                 this.fishingBoxLegs.add(leg);
+
+                const mudFoot = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.026, 0.030, 0.012, 12),
+                    this.fishingBoxAccentMat
+                );
+                mudFoot.position.set(lx, -0.195, lz);
+                this.fishingBoxLegs.add(mudFoot);
             }
         }
         this.fishingBoxGroup.add(this.fishingBoxLegs);
@@ -386,74 +569,183 @@ export class FishingGameplay {
         this.fishingBoxGroup.rotation.y = 0.28;
         this.fpvRig.add(this.fishingBoxGroup);
 
-        // 2C. Ô CÂU ĐÀI 3D PHÍA TRÊN ĐẦU (Che nắng/mưa cực thực tế khi nâng cấp từ Lv.2 -> Lv.4)
+        // 2C. Ô CHE NẮNG CÂU ĐÀI 3D VÒM PARABOL 12 MÚI + 12 NAN SỢI THỦY TINH + DIỀM RỦ + KHỚP LÒ XO NGHIÊNG CỔ Ô (PHÍM O)
+        this.umbrellaPose = 'OPEN'; // 'OPEN' | 'TILT' | 'FOLD'
         this.umbrellaGroup = new THREE.Group();
+
         this.umbrellaCanopyMat = new THREE.MeshStandardMaterial({
-            color: 0x0284c7,
-            roughness: 0.55,
-            metalness: 0.12,
-            side: THREE.DoubleSide
+            color: 0x0369a1,
+            roughness: 0.48,
+            metalness: 0.14,
+            side: THREE.FrontSide
+        });
+        // Lớp tráng bạc / Vinyl đen chống tia UV mát dịu bên dưới vòm ô khi ngước mắt nhìn lên!
+        this.umbrellaUnderCoatMat = new THREE.MeshStandardMaterial({
+            color: 0xcbd5e1,
+            roughness: 0.32,
+            metalness: 0.68,
+            side: THREE.BackSide
         });
         this.umbrellaTrimMat = new THREE.MeshStandardMaterial({
-            color: 0xfacc15,
-            metalness: 0.7,
-            roughness: 0.25,
+            color: 0xbae6fd,
+            metalness: 0.65,
+            roughness: 0.24,
             side: THREE.DoubleSide
         });
 
-        // Tán ô chính vòm cong rộng che trên góc nhìn
-        const canopyMain = new THREE.Mesh(
-            new THREE.ConeGeometry(1.15, 0.34, 16, 1, true),
+        // Trục dưới cắm vào pat sau Thùng Câu Đài + Khớp lò xo Inox bẻ góc cổ ô
+        const lowerPole = new THREE.Mesh(new THREE.CylinderGeometry(0.013, 0.015, 0.78, 12), cncInoxMat);
+        lowerPole.position.set(-0.56, -0.22, -0.46);
+        this.umbrellaGroup.add(lowerPole);
+
+        const springJoint = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.020, 0.020, 0.068, 12),
+            new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.88, roughness: 0.2 })
+        );
+        springJoint.position.set(-0.56, 0.18, -0.46);
+        this.umbrellaGroup.add(springJoint);
+
+        // Cụm Đỉnh Tán Ô có thể nghiêng quanh khớp lò xo (umbrellaHeadPivot)
+        this.umbrellaHeadPivot = new THREE.Group();
+        this.umbrellaHeadPivot.position.set(-0.56, 0.18, -0.46);
+
+        // Thanh giằng cổ ô vươn che đúng trên đầu người chơi (offset +0.52, +0.58, +0.16)
+        const upperPole = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.013, 0.72, 12), cncInoxMat);
+        upperPole.position.set(0.26, 0.28, 0.08);
+        upperPole.rotation.z = -0.66;
+        upperPole.rotation.x = 0.22;
+        this.umbrellaHeadPivot.add(upperPole);
+
+        this.umbrellaCanopyHolder = new THREE.Group();
+        this.umbrellaCanopyHolder.position.set(0.52, 0.56, 0.16);
+
+        // Biên dạng vòm cong Parabol 12 múi chuẩn ô câu đài ngoài đời thực
+        const domeLathePts = [];
+        const maxR = 1.26;
+        const domeH = 0.34;
+        for (let s = 0; s <= 12; s++) {
+            const u = s / 12; // 0 (đỉnh ô) -> 1 (mép rìa ô)
+            const r = u * maxR;
+            const y = domeH * (1.0 - Math.pow(u, 1.72));
+            domeLathePts.push(new THREE.Vector2(r, y));
+        }
+        const domeGeo = new THREE.LatheGeometry(domeLathePts, 12);
+
+        const canopyOuter = new THREE.Mesh(domeGeo, this.umbrellaCanopyMat);
+        this.umbrellaCanopyHolder.add(canopyOuter);
+
+        const canopyInner = new THREE.Mesh(domeGeo, this.umbrellaUnderCoatMat);
+        canopyInner.scale.set(0.996, 0.994, 0.996);
+        this.umbrellaCanopyHolder.add(canopyInner);
+
+        // Diềm ô rủ xung quanh mép tán (Valance Skirt) che nắng chói tầm mắt + Viền kim tuyến
+        this.umbrellaValance = new THREE.Mesh(
+            new THREE.CylinderGeometry(maxR, maxR * 1.015, 0.072, 12, 1, true),
             this.umbrellaCanopyMat
         );
-        canopyMain.position.set(0, 0.72, -0.25);
-        this.umbrellaGroup.add(canopyMain);
+        this.umbrellaValance.position.y = -0.034;
+        this.umbrellaCanopyHolder.add(this.umbrellaValance);
 
-        // Viền trang trí mép tán ô
-        const canopyTrim = new THREE.Mesh(
-            new THREE.TorusGeometry(1.14, 0.016, 8, 24),
+        const trimRibbon = new THREE.Mesh(
+            new THREE.CylinderGeometry(maxR * 1.016, maxR * 1.018, 0.015, 12, 1, true),
             this.umbrellaTrimMat
         );
-        canopyTrim.rotation.x = Math.PI / 2;
-        canopyTrim.position.set(0, 0.55, -0.25);
-        this.umbrellaGroup.add(canopyTrim);
+        trimRibbon.position.y = -0.064;
+        this.umbrellaCanopyHolder.add(trimRibbon);
 
-        // Tầng ô thoáng gió thứ 2 (hiện từ Lv.3 trở lên)
+        // Hệ khung 12 Nan Xương Sợi Thủy Tinh + Con Trượt Khóa Lẫy + 12 Nan Chống Chéo nhìn rõ từ dưới ghế câu!
+        const fibreglassRibMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.65, roughness: 0.28 });
+        const runnerHub = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.032, 0.045, 12), darkCarbonMat);
+        runnerHub.position.y = 0.04;
+        this.umbrellaCanopyHolder.add(runnerHub);
+
+        const centerMastStub = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.36, 10), cncInoxMat);
+        centerMastStub.position.y = 0.18;
+        this.umbrellaCanopyHolder.add(centerMastStub);
+
+        for (let k = 0; k < 12; k++) {
+            const ang = (k / 12) * Math.PI * 2;
+            const ribGroup = new THREE.Group();
+            ribGroup.rotation.y = ang;
+
+            // Nan chính chạy sát vòm ô ra tận đầu múi + đầu bọc kim loại
+            const mainRib = new THREE.Mesh(new THREE.CylinderGeometry(0.0042, 0.0032, 1.29, 6), fibreglassRibMat);
+            mainRib.position.set(0.63, 0.165, 0);
+            mainRib.rotation.z = -(Math.PI / 2 - 0.265);
+            ribGroup.add(mainRib);
+
+            // Nan chống chéo từ con trượt (runnerHub) lên giữa nan chính
+            const stretcher = new THREE.Mesh(new THREE.CylinderGeometry(0.0035, 0.0035, 0.62, 6), cncInoxMat);
+            stretcher.position.set(0.30, 0.125, 0);
+            stretcher.rotation.z = -(Math.PI / 2 - 0.29);
+            ribGroup.add(stretcher);
+
+            const ribCap = new THREE.Mesh(new THREE.SphereGeometry(0.0085, 8, 8), this.umbrellaTrimMat);
+            ribCap.position.set(maxR * 1.01, -0.068, 0);
+            ribGroup.add(ribCap);
+
+            this.umbrellaCanopyHolder.add(ribGroup);
+        }
+
+        // Tầng thông gió chống lật số 2 (hiện từ Lv.3 trở lên) + Chóp thu lôi CNC trên đỉnh
+        const ventLathePts = [];
+        for (let s = 0; s <= 8; s++) {
+            const u = s / 8;
+            ventLathePts.push(new THREE.Vector2(u * 0.62, 0.18 * (1.0 - Math.pow(u, 1.65))));
+        }
         this.umbrellaSecondLayer = new THREE.Mesh(
-            new THREE.ConeGeometry(0.62, 0.20, 14, 1, true),
+            new THREE.LatheGeometry(ventLathePts, 12),
             this.umbrellaTrimMat
         );
-        this.umbrellaSecondLayer.position.set(0, 0.88, -0.25);
-        this.umbrellaGroup.add(this.umbrellaSecondLayer);
+        this.umbrellaSecondLayer.position.y = 0.25;
+        this.umbrellaSecondLayer.visible = false;
+        this.umbrellaCanopyHolder.add(this.umbrellaSecondLayer);
 
-        // Trục ô inox cắm bên trái thùng câu
-        const umbPole = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.014, 0.016, 1.35, 10),
-            new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.9, roughness: 0.18 })
+        const lightningFinial = new THREE.Mesh(
+            new THREE.ConeGeometry(0.024, 0.085, 12),
+            this.umbrellaTrimMat
         );
-        umbPole.position.set(-0.56, 0.05, -0.45);
-        this.umbrellaGroup.add(umbPole);
+        lightningFinial.position.y = 0.44;
+        this.umbrellaCanopyHolder.add(lightningFinial);
 
-        this.umbrellaGroup.visible = false; // Mặc định Lv.1 chưa có ô
+        this.umbrellaHeadPivot.add(this.umbrellaCanopyHolder);
+        this.umbrellaGroup.add(this.umbrellaHeadPivot);
+        this.umbrellaGroup.visible = true; // Có sẵn Ô che nắng 1.8m từ Lv.1 (bấm O để Nghiêng/Gập tùy ý!)
         this.fpvRig.add(this.umbrellaGroup);
 
-        // Vành miệng rọng cá hợp kim nhôm xanh dương đặt bên trái mép nước
-        const keepnetRim = new THREE.Mesh(
-            new THREE.TorusGeometry(0.22, 0.011, 10, 28),
-            new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.85, roughness: 0.2 })
-        );
-        keepnetRim.rotation.x = Math.PI / 2.4;
-        keepnetRim.position.set(-0.48, -0.46, -1.32);
-        this.rodRestSupport.add(keepnetRim);
+        // 2D. RỌNG CÁ NGÂM NƯỚC ĐA ĐAI NỔI (Vành hợp kim Anod xanh + Khớp cắm bờ + 3 Vòng đai giữ form dưới nước)
+        this.keepnetGroup = new THREE.Group();
+        const anodBlueMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.88, roughness: 0.18 });
+
+        const keepnetBracket = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.008, 0.34, 8), cncInoxMat);
+        keepnetBracket.rotation.x = THREE.MathUtils.degToRad(-55);
+        keepnetBracket.position.set(-0.48, -0.42, -1.08);
+        this.keepnetGroup.add(keepnetBracket);
+
+        const keepnetRim = new THREE.Mesh(new THREE.TorusGeometry(0.225, 0.0115, 10, 32), anodBlueMat);
+        keepnetRim.rotation.x = Math.PI / 2.35;
+        keepnetRim.position.set(-0.48, -0.45, -1.32);
+        this.keepnetGroup.add(keepnetRim);
+
+        for (let rIdx = 1; rIdx <= 2; rIdx++) {
+            const subHoop = new THREE.Mesh(
+                new THREE.TorusGeometry(0.215 - rIdx * 0.012, 0.0075, 8, 28),
+                anodBlueMat
+            );
+            subHoop.rotation.x = Math.PI / 2.35;
+            subHoop.position.set(-0.48, -0.45 - rIdx * 0.15, -1.32 - rIdx * 0.065);
+            this.keepnetGroup.add(subHoop);
+        }
 
         const keepnetMesh = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.21, 0.18, 0.45, 18, 3, true),
-            new THREE.MeshBasicMaterial({ color: 0x38bdf8, wireframe: true, transparent: true, opacity: 0.45 })
+            new THREE.CylinderGeometry(0.22, 0.185, 0.52, 22, 5, true),
+            new THREE.MeshBasicMaterial({ color: 0x38bdf8, wireframe: true, transparent: true, opacity: 0.52 })
         );
-        keepnetMesh.rotation.x = 0.28;
-        keepnetMesh.position.set(-0.48, -0.66, -1.42);
-        this.rodRestSupport.add(keepnetMesh);
+        keepnetMesh.rotation.x = 0.32;
+        keepnetMesh.position.set(-0.48, -0.68, -1.43);
+        this.keepnetGroup.add(keepnetMesh);
 
+        this.rodRestSupport.add(this.keepnetGroup);
         this.fpvRig.add(this.rodRestSupport);
 
         // 3. CẦN CÂU ĐÀI CARBON LIỀN KHỐI UỐN CONG MƯỢT MÀ (SEAMLESS CONTINUOUS DEFORMABLE CARBON POLE)
@@ -1347,11 +1639,14 @@ export class FishingGameplay {
         if (this.rodRestHeadMat && rodRest) this.rodRestHeadMat.color.setHex(rodRest.headColor);
         if (this.rodRestTipMat && rodRest) this.rodRestTipMat.color.setHex(rodRest.tipColor);
 
-        // 5. Pad / Khay đựng mồi (Ẩn/hiện tầng 2, tầng 3, vành chắn gió, đổi màu inox/vàng)
+        // 5. Pad / Khay đựng mồi (Ẩn/hiện tầng 2, tầng 3, vành chắn nắng, đổi màu inox/vàng)
         if (this.baitTrayRimMat && baitPad) this.baitTrayRimMat.color.setHex(baitPad.rimColor);
         if (this.baitTrayInnerMat && baitPad) this.baitTrayInnerMat.color.setHex(baitPad.innerColor);
         if (this.baitTowelMat && baitPad) this.baitTowelMat.color.setHex(baitPad.towelColor);
-        if (this.baitTrayLowerBowl && baitPad) this.baitTrayLowerBowl.visible = baitPad.trayLayers >= 2;
+        if (this.baitTrayLowerBowl && baitPad) {
+            const hasGround = !!(this.activeGroundBait && this.activeGroundBait.charges > 0);
+            this.baitTrayLowerBowl.visible = (baitPad.trayLayers >= 2) || hasGround;
+        }
         if (this.baitTrayThirdBowl && baitPad) this.baitTrayThirdBowl.visible = baitPad.trayLayers >= 3;
         if (this.baitTrayCover && baitPad) this.baitTrayCover.visible = !!baitPad.hasCover;
 
@@ -1360,11 +1655,19 @@ export class FishingGameplay {
         if (this.fishingBoxAccentMat && box) this.fishingBoxAccentMat.color.setHex(box.accentColor);
         if (this.fishingBoxLegs && box) this.fishingBoxLegs.visible = !!box.hasLegs;
 
-        // 7. Ô câu đài 3D
+        // 7. Ô che nắng câu đài 3D (Hỗ trợ vòm rộng theo cấp Lv.1 -> Lv.4, lớp lót Vinyl đen/bạc UV & tầng thoáng gió 2)
         if (this.umbrellaGroup && umbrella) {
-            this.umbrellaGroup.visible = !!umbrella.visible;
+            this.umbrellaGroup.visible = (!!umbrella.visible) && (this.umbrellaPose !== 'FOLD');
             if (this.umbrellaCanopyMat) this.umbrellaCanopyMat.color.setHex(umbrella.canopyColor);
             if (this.umbrellaTrimMat) this.umbrellaTrimMat.color.setHex(umbrella.trimColor);
+            if (this.umbrellaUnderCoatMat) {
+                // Lv.4 phủ Vinyl đen chống nóng tuyệt đối bên trong, Lv.1-3 phủ Bạc UV sáng dịu
+                this.umbrellaUnderCoatMat.color.setHex(umbrella.level >= 4 ? 0x1e293b : 0xcbd5e1);
+            }
+            if (this.umbrellaCanopyHolder) {
+                const cScale = umbrella.canopyScale || 1.0;
+                this.umbrellaCanopyHolder.scale.set(cScale, 1.0, cScale);
+            }
             if (this.umbrellaSecondLayer) this.umbrellaSecondLayer.visible = !!umbrella.doubleLayer;
         }
 
@@ -1715,33 +2018,57 @@ export class FishingGameplay {
         this.landingNetGroup = new THREE.Group();
         this.landingNetGroup.visible = false;
 
+        // Cán vợt hớt cá Carbon đan chéo có bọc EVA nhám + Khớp ốc đồng chữ Y + Vành Anod xanh + Lưới mắt cáo sâu
+        const netCarbonTex = createCarbonWeaveTexture();
         const handle = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.012, 0.016, 2.9, 10),
-            new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.8 })
+            new THREE.CylinderGeometry(0.0115, 0.0165, 2.92, 14),
+            new THREE.MeshStandardMaterial({ map: netCarbonTex, color: 0x1e293b, metalness: 0.72, roughness: 0.22 })
         );
         handle.rotation.x = THREE.MathUtils.degToRad(-78);
         handle.position.set(-0.22, -0.34, -1.25);
         this.landingNetGroup.add(handle);
 
+        const ySpreader = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.016, 0.014, 0.08, 12),
+            new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.92, roughness: 0.16 })
+        );
+        ySpreader.rotation.x = THREE.MathUtils.degToRad(-78);
+        ySpreader.position.set(-0.145, -0.09, -2.32);
+        this.landingNetGroup.add(ySpreader);
+
         const hoop = new THREE.Mesh(
-            new THREE.TorusGeometry(0.34, 0.012, 10, 28),
-            new THREE.MeshStandardMaterial({ color: 0x38bdf8, metalness: 0.85 })
+            new THREE.TorusGeometry(0.36, 0.0115, 12, 36),
+            new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.88, roughness: 0.16 })
         );
         hoop.rotation.x = Math.PI / 2.2;
-        hoop.position.set(-0.12, -0.05, -2.65);
+        hoop.position.set(-0.12, -0.05, -2.68);
         this.landingNetGroup.add(hoop);
 
         const meshNet = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.34, 0.18, 0.42, 18, 2, true),
+            new THREE.CylinderGeometry(0.355, 0.19, 0.48, 24, 5, true),
             new THREE.MeshBasicMaterial({
                 color: 0xe0f2fe,
                 wireframe: true,
                 transparent: true,
-                opacity: 0.7
+                opacity: 0.72
             })
         );
-        meshNet.position.set(-0.12, -0.25, -2.65);
+        meshNet.position.set(-0.12, -0.28, -2.68);
         this.landingNetGroup.add(meshNet);
+
+        const netFlatBottom = new THREE.Mesh(
+            new THREE.CircleGeometry(0.19, 20),
+            new THREE.MeshBasicMaterial({
+                color: 0xbae6fd,
+                wireframe: true,
+                transparent: true,
+                opacity: 0.65,
+                side: THREE.DoubleSide
+            })
+        );
+        netFlatBottom.rotation.x = Math.PI / 2;
+        netFlatBottom.position.set(-0.12, -0.52, -2.68);
+        this.landingNetGroup.add(netFlatBottom);
 
         this.fpvRig.add(this.landingNetGroup);
     }
@@ -1794,24 +2121,121 @@ export class FishingGameplay {
         return true;
     }
 
-    // Đồng bộ hiển thị 3D của khay mồi từ tính theo lượng mồi câu & mồi xả đã pha
+    // Đồng bộ trực quan 3D Khay Mồi theo đúng Loại Mồi (Cám Vê / Ốc Xoắn / Hạt Ngô Vàng) & Số Lượng Mồi Vê Còn Lại!
     updateBaitTrayVisuals() {
-        const hookCharges = (this.activeHookBait && typeof this.activeHookBait.charges === 'number')
-            ? this.activeHookBait.charges
-            : (this.activeHookBait ? 4 : 0);
-        const groundCharges = (this.activeGroundBait && typeof this.activeGroundBait.charges === 'number')
-            ? this.activeGroundBait.charges
-            : (this.activeGroundBait ? 3 : 0);
+        const hb = this.activeHookBait;
+        const gb = this.activeGroundBait;
+        const hookCharges = (hb && typeof hb.charges === 'number') ? hb.charges : (hb ? 16 : 0);
+        const maxHook = (hb && typeof hb.maxCharges === 'number' && hb.maxCharges > 0) ? hb.maxCharges : Math.max(16, hookCharges);
+        const groundCharges = (gb && typeof gb.charges === 'number') ? gb.charges : (gb ? 8 : 0);
+        const maxGround = (gb && typeof gb.maxCharges === 'number' && gb.maxCharges > 0) ? gb.maxCharges : Math.max(10, groundCharges);
 
+        const mode = (hb && hb.fishingMode) || (gb && gb.fishingMode) || 'CAM';
+
+        // 1. Khay mồi xả tầng dưới: bật khay xả khi có mồi xả, hạ dần độ phồng ụ mồi theo tỷ lệ còn lại
+        if (this.baitTrayLowerBowl) {
+            const padLv = (this.equipLevels && this.equipLevels.baitPad) || 1;
+            this.baitTrayLowerBowl.visible = (padLv >= 2) || (groundCharges > 0);
+        }
         if (this.crumbSurfaceMesh) {
             this.crumbSurfaceMesh.visible = groundCharges > 0;
+            const fillRatio = THREE.MathUtils.clamp(groundCharges / maxGround, 0.18, 1.0);
+            this.crumbSurfaceMesh.scale.set(1.0, 0.35 + fillRatio * 0.85, 1.0);
+
+            if (this.crumbMoundMat && this.crumbGrainMat) {
+                if (mode === 'CORN') {
+                    this.crumbMoundMat.color.setHex(0xca8a04);
+                    this.crumbGrainMat.color.setHex(0xfef08a);
+                } else if (mode === 'SNAIL') {
+                    this.crumbMoundMat.color.setHex(0x57534e);
+                    this.crumbGrainMat.color.setHex(0x1c1917);
+                } else {
+                    this.crumbMoundMat.color.setHex(0xb45309);
+                    this.crumbGrainMat.color.setHex(0xfbbf24);
+                }
+            }
         }
+
+        // 2. 16 Phần tử mồi câu trên Đĩa Từ: đổi hình thái & số lượng hiển thị mượt mà
         if (this.baitTrayBalls && this.baitTrayBalls.length > 0) {
-            const visibleBalls = hookCharges <= 0 ? 0 : Math.min(4, Math.ceil((hookCharges / 10) * 4));
-            this.baitTrayBalls.forEach((b, idx) => {
-                b.visible = idx < visibleBalls;
+            const totalSlots = this.baitTrayBalls.length; // 16 vị trí đồng tâm
+            let visibleCount = 0;
+            if (hookCharges > 0) {
+                if (hookCharges <= totalSlots) {
+                    visibleCount = hookCharges; // Khi còn <= 16 viên: hiển thị chuẩn từng viên một tới viên cuối cùng!
+                } else {
+                    visibleCount = Math.max(1, Math.min(totalSlots, Math.ceil((hookCharges / maxHook) * totalSlots)));
+                }
+            }
+
+            if (this.baitBallPrimaryMat && this.baitBallAccentMat) {
+                if (mode === 'SNAIL') {
+                    this.baitBallPrimaryMat.color.setHex(0x292524);
+                    this.baitBallPrimaryMat.roughness = 0.25;
+                    this.baitBallAccentMat.color.setHex(0x44403c);
+                } else if (mode === 'CORN') {
+                    this.baitBallPrimaryMat.color.setHex(0xfacc15);
+                    this.baitBallPrimaryMat.roughness = 0.22;
+                    this.baitBallAccentMat.color.setHex(0xeab308);
+                } else {
+                    const isSoft = hb && hb.baitFirmness === 'SOFT';
+                    this.baitBallPrimaryMat.color.setHex(isSoft ? 0xea580c : 0xd97706);
+                    this.baitBallPrimaryMat.roughness = 0.78;
+                    this.baitBallAccentMat.color.setHex(0x92400e);
+                }
+            }
+
+            this.baitTrayBalls.forEach((grp, idx) => {
+                const show = idx < visibleCount;
+                grp.visible = show;
+                if (!show || !grp.userData) return;
+                const { mainPiece, snailTip, baseY } = grp.userData;
+                if (mode === 'SNAIL') {
+                    mainPiece.scale.set(0.95, 0.92, 1.05);
+                    snailTip.visible = true;
+                    grp.position.y = baseY;
+                } else if (mode === 'CORN') {
+                    mainPiece.scale.set(1.16, 0.74, 0.92);
+                    snailTip.visible = false;
+                    grp.position.y = baseY - 0.003;
+                } else {
+                    const firmScale = (hb && hb.baitFirmness === 'SOFT') ? 1.12 : ((hb && hb.baitFirmness === 'HARD') ? 0.88 : 1.0);
+                    mainPiece.scale.set(firmScale, firmScale * 0.88, firmScale);
+                    snailTip.visible = false;
+                    grp.position.y = baseY;
+                }
             });
         }
+    }
+
+    // Chuyển đổi 3 tư thế Ô Che Nắng Câu Đài (Mở Thẳng ➔ Bẻ Khớp Lò Xo Nghiêng 45° Chắn Nắng Xiên ➔ Thu Gọn Ô)
+    cycleUmbrellaPose() {
+        const order = ['OPEN', 'TILT', 'FOLD'];
+        const curIdx = order.indexOf(this.umbrellaPose || 'OPEN');
+        this.umbrellaPose = order[(curIdx + 1) % order.length];
+
+        if (this.umbrellaGroup) {
+            this.umbrellaGroup.visible = (this.umbrellaPose !== 'FOLD');
+        }
+        if (this.umbrellaPose === 'OPEN') {
+            return {
+                pose: 'OPEN',
+                shortBtn: '⛱️ Ô: Mở',
+                message: '⛱️ Đã dựng thẳng Ô Câu Đài che mát đỉnh đầu & giảm bóng lóa mặt nước!'
+            };
+        }
+        if (this.umbrellaPose === 'TILT') {
+            return {
+                pose: 'TILT',
+                shortBtn: '⛱️ Ô: Nghiêng',
+                message: '⛱️ Đã bẻ khớp lò xo nghiêng cổ ô chắn nắng xiên & mưa tạt ngang chuẩn đài thủ!'
+            };
+        }
+        return {
+            pose: 'FOLD',
+            shortBtn: '⛱️ Ô: Gập',
+            message: '🌤️ Đã thu gọn Ô Câu Đài để ngắm trọn bầu trời hồ câu (Bấm O để mở lại ô).'
+        };
     }
 
     getCastDistance() {
@@ -2292,17 +2716,20 @@ export class FishingGameplay {
         };
     }
 
-    // Dựng lại mô hình cá bị đóng theo đúng loài (chép / trắm đen / trắm cỏ / rô phi)
-    setFightFishModel(speciesKey, weight) {
+    // Dựng lại mô hình cá bị đóng theo đúng loài (chép / chép củ / trắm đen / trắm cỏ / rô phi + khuyên vàng 3D nếu trúng cá giải!)
+    setFightFishModel(speciesKey, weight, isTaggedPrize = false) {
         while (this.fish3DGroup.children.length > 0) {
             this.fish3DGroup.remove(this.fish3DGroup.children[0]);
         }
-        const model = buildRealisticFish(speciesKey, weight, { noScale: true });
+        const model = buildRealisticFish(speciesKey, weight, { noScale: true, isTaggedPrize });
         const holder = new THREE.Group();
-        holder.rotation.y = Math.PI; // Mô hình mũi +Z -> cá đang bơi mũi hướng -Z theo quy ước cũ của hệ cá bị đóng
+        holder.rotation.y = Math.PI; // Mô hình mũi +Z -> cá đang bơi mũi hướng -Z theo quy ước của hệ cá bị đóng
         holder.add(model);
         this.fish3DGroup.add(holder);
+        this.fishHolderGroup = holder;
         this.fishTailMesh = model.userData.tailPivot;
+        this.fishLeftFin = model.userData.leftFin;
+        this.fishRightFin = model.userData.rightFin;
     }
 
     initFishFight() {
@@ -2423,7 +2850,7 @@ export class FishingGameplay {
 
         const fScale = THREE.MathUtils.clamp(0.7 + this.hookedFish.weight / 14.0, 0.8, 1.75);
         this.fish3DGroup.scale.set(fScale, fScale, fScale);
-        this.setFightFishModel(this.hookedFish.speciesKey, this.hookedFish.weight);
+        this.setFightFishModel(this.hookedFish.speciesKey, this.hookedFish.weight, !!this.hookedFish.isTaggedPrize);
     }
 
     hideAllWaterSpray() {
@@ -3323,8 +3750,20 @@ export class FishingGameplay {
         }
 
         if (this.fishTailMesh) {
+            const nowMs = performance.now();
             const tailSpeed = this.isSantoJumping ? 0.055 : ((this.fightPhase === FIGHT_PHASES.TAP_TO_NET) ? 0.006 : 0.032);
-            this.fishTailMesh.rotation.y = Math.sin(performance.now() * tailSpeed) * (this.isSantoJumping ? 0.72 : 0.52);
+            const beat = Math.sin(nowMs * tailSpeed);
+            this.fishTailMesh.rotation.y = beat * (this.isSantoJumping ? 0.72 : 0.54);
+            // Uốn lắc toàn thân ngược pha nhẹ với cuống đuôi tạo sóng bơi S-wave cực sống động
+            if (this.fishHolderGroup) {
+                const bodyAmp = (this.fightPhase === FIGHT_PHASES.TAP_TO_NET) ? 0.03 : 0.14;
+                this.fishHolderGroup.rotation.y = Math.PI - beat * bodyAmp;
+            }
+            if (this.fishLeftFin && this.fishRightFin) {
+                const finBeat = Math.sin(nowMs * (tailSpeed * 0.85) + 0.8) * 0.28;
+                this.fishLeftFin.rotation.y = 0.26 + finBeat;
+                this.fishRightFin.rotation.y = -0.26 - finBeat;
+            }
         }
 
         this.wakeSplashCooldown -= delta;
@@ -3402,8 +3841,19 @@ export class FishingGameplay {
             this.floatShaderUniforms.uSubmergeDepth.value = THREE.MathUtils.lerp(0.038, 0.024, turbidity);
         }
 
-        // 1. Cập nhật đường cong Parabol liền mạch của thân cần câu đài
+        // 1. Cập nhật đường cong Parabol liền mạch của thân cần câu đài & chuyển động khớp lò xo Ô Che Nắng
         this.applyArticulatedRodPose(delta);
+
+        if (this.umbrellaHeadPivot && this.umbrellaGroup && this.umbrellaGroup.visible) {
+            const isRain = this.environment && this.environment.weather === 'RAINY';
+            const windAmp = isRain ? 0.022 : 0.008;
+            const nowS = performance.now() * 0.0018;
+            const targetTiltX = this.umbrellaPose === 'TILT' ? 0.34 : 0.04;
+            const targetTiltZ = this.umbrellaPose === 'TILT' ? -0.22 : 0.0;
+            const lerpU = Math.min(1, delta * 6.5);
+            this.umbrellaHeadPivot.rotation.x += (targetTiltX + Math.sin(nowS) * windAmp - this.umbrellaHeadPivot.rotation.x) * lerpU;
+            this.umbrellaHeadPivot.rotation.z += (targetTiltZ + Math.cos(nowS * 1.3) * windAmp - this.umbrellaHeadPivot.rotation.z) * lerpU;
+        }
 
         const fPos = this.floatTargetPos;
         const toCam = new THREE.Vector3()
