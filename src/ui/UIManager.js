@@ -1475,6 +1475,7 @@ export class UIManager {
                         localStorage.removeItem('vn_carp_equip_v1');
                         localStorage.removeItem('vn_carp_rig_v1');
                         localStorage.removeItem('vn_carp_owned_lakes_v1');
+                        localStorage.removeItem('vn_carp_first_fight_done_v1');
                     } catch (e) {}
                     window.location.reload();
                 }
@@ -5459,6 +5460,11 @@ export class UIManager {
                 if (b) b.classList.remove('required-key', 'pressed-key');
             });
 
+            // Chỉ bật màu hướng dẫn cách bo cho ĐÚNG 1 LẦN ĐẦU TIÊN người chơi bo cá!
+            // Từ lần thứ 2 trở đi, tất cả các nút giống hệt nhau — người chơi tự nhìn Thanh Công Cụ để phối hợp Ghì / Hạ / Trái / Phải!
+            const showGuide = !!this.gameplay.showFightButtonGuide;
+            const elapsedSec = Math.floor(this.gameplay.fightElapsedTime || 0);
+
             // Đồng bộ vị trí Núm Tròn ở tâm theo cả Chuột/Cảm ứng kéo lẫn phím W/A/S/D / Mũi tên!
             const leanVal = this.gameplay.playerRodLean || 0;
             const vertVal = this.gameplay.playerRodVert || 0;
@@ -5468,17 +5474,19 @@ export class UIManager {
 
             if (knobEl) {
                 knobEl.style.transform = `translate(calc(-50% + ${knobDx.toFixed(1)}px), calc(-50% + ${knobDy.toFixed(1)}px))`;
-                knobEl.classList.toggle('knob-active', padState.active || Math.abs(leanVal) > 0.15 || Math.abs(vertVal) > 0.15);
+                knobEl.classList.toggle('knob-active', showGuide && (padState.active || Math.abs(leanVal) > 0.15 || Math.abs(vertVal) > 0.15));
                 knobEl.classList.toggle('knob-net-ready', phase === 'TAP_TO_NET');
             }
             if (circlePadEl) {
-                circlePadEl.classList.toggle('pad-danger-tension', tension >= 0.78);
+                circlePadEl.classList.toggle('pad-danger-tension', showGuide && tension >= 0.78);
             }
 
-            if (vertVal > 0.22 && btnUp) btnUp.classList.add('pressed-key');
-            if (vertVal < -0.22 && btnDown) btnDown.classList.add('pressed-key');
-            if (leanVal < -0.22 && btnLeft) btnLeft.classList.add('pressed-key');
-            if (leanVal > 0.22 && btnRight) btnRight.classList.add('pressed-key');
+            if (showGuide) {
+                if (vertVal > 0.22 && btnUp) btnUp.classList.add('pressed-key');
+                if (vertVal < -0.22 && btnDown) btnDown.classList.add('pressed-key');
+                if (leanVal < -0.22 && btnLeft) btnLeft.classList.add('pressed-key');
+                if (leanVal > 0.22 && btnRight) btnRight.classList.add('pressed-key');
+            }
 
             // CẬP NHẬT THANH VẠCH CÂN BẰNG LỰC BO TRÁI / BO PHẢI
             const bal = Math.max(-1, Math.min(1, this.gameplay.forceBalance || 0));
@@ -5505,23 +5513,35 @@ export class UIManager {
                 balVector.style.width = `${vecPct.toFixed(1)}%`;
             }
             if (balHint) {
-                if (tension >= 0.80 && phase !== 'UNDER_PIER' && phase !== 'TAP_TO_NET') {
-                    balHint.innerText = '🚨 CƯỚC CĂNG ĐỎ! Kéo nút tròn XUỐNG [▼ HẠ NHẢ] xả lực ngay!';
-                } else if (absBal <= 0.36) {
-                    balHint.innerText = '🎯 CÂN BẰNG CHUẨN! Kéo [▲ GHÌ LÊN] để thu cá vào bờ';
-                } else if (absBal <= 0.74) {
-                    balHint.innerText = bal < 0
-                        ? '⬅️ Lệch TRÁI ➔ Kéo nút tròn sang [PHẢI ▶]'
-                        : '➡️ Lệch PHẢI ➔ Kéo nút tròn sang [◀ TRÁI]';
+                if (showGuide) {
+                    if (tension >= 0.80 && phase !== 'UNDER_PIER' && phase !== 'TAP_TO_NET') {
+                        balHint.innerText = '🎓 [Hướng dẫn] Cước căng đỏ ➔ Kéo XUỐNG [▼ HẠ NHẢ]!';
+                    } else if (absBal <= 0.36) {
+                        balHint.innerText = '🎓 [Hướng dẫn] Cân bằng chuẩn ➔ Kéo [▲ GHÌ LÊN] thu cá!';
+                    } else {
+                        balHint.innerText = bal < 0
+                            ? '🎓 [Hướng dẫn] Kim lệch TRÁI ➔ Kéo sang [PHẢI ▶]'
+                            : '🎓 [Hướng dẫn] Kim lệch PHẢI ➔ Kéo sang [◀ TRÁI]';
+                    }
                 } else {
-                    balHint.innerText = bal < 0
-                        ? '🚨 THẲNG CẦN TRÁI! Kéo gấp sang [PHẢI ▶]!'
-                        : '🚨 THẲNG CẦN PHẢI! Kéo gấp sang [◀ TRÁI]!';
+                    // Từ lần 2 trở đi: Chỉ hiển thị trạng thái thanh công cụ khách quan, người chơi tự phán đoán thao tác!
+                    if (absBal <= 0.36) {
+                        balHint.innerText = '⚖️ Thanh cân bằng lực: Vùng tâm chuẩn';
+                    } else if (absBal <= 0.74) {
+                        balHint.innerText = bal < 0 ? '⚠️ Thanh lực đang lệch Trái' : '⚠️ Thanh lực đang lệch Phải';
+                    } else {
+                        balHint.innerText = bal < 0 ? '🚨 Quá tải góc Trái!' : '🚨 Quá tải góc Phải!';
+                    }
                 }
             }
 
+            if (lblUp) {
+                lblUp.innerText = 'GHÌ LÊN';
+            }
             if (lblDown) {
-                lblDown.innerText = phase === 'TAP_TO_NET' ? 'HỚT VỢT' : (tension >= 0.76 ? 'XẢ CĂNG!' : 'HẠ NHẢ');
+                lblDown.innerText = showGuide
+                    ? (phase === 'TAP_TO_NET' ? 'HỚT VỢT' : (tension >= 0.76 ? 'XẢ CĂNG!' : 'HẠ NHẢ'))
+                    : 'HẠ NHẢ';
             }
             if (knobIco && knobTxt) {
                 if (phase === 'TAP_TO_NET') {
@@ -5535,68 +5555,84 @@ export class UIManager {
 
             const hazard = this.gameplay.stakeHazard;
             if (hazard) {
-                phaseBadge.innerText = `⚠️ LAO CỌC ${hazard.side === 'LEFT' ? 'TRÁI' : 'PHẢI'} ➔ KÉO ${hazard.side === 'LEFT' ? 'PHẢI ▶' : '◀ TRÁI'} (${hazard.timeLeft.toFixed(1)}s)`;
+                phaseBadge.innerText = showGuide
+                    ? `⚠️ LAO CỌC ${hazard.side === 'LEFT' ? 'TRÁI' : 'PHẢI'} ➔ KÉO ${hazard.side === 'LEFT' ? 'PHẢI ▶' : '◀ TRÁI'} (${hazard.timeLeft.toFixed(1)}s)`
+                    : `⚠️ CÁ LAO CỌC ${hazard.side === 'LEFT' ? 'TRÁI' : 'PHẢI'}! (${hazard.timeLeft.toFixed(1)}s)`;
                 phaseBadge.className = 'fight-phase-tag fight-phase-hazard';
-                if (hazard.requiredKey === 'right' && btnRight) btnRight.classList.add('required-key');
-                else if (hazard.requiredKey === 'left' && btnLeft) btnLeft.classList.add('required-key');
+                if (showGuide) {
+                    if (hazard.requiredKey === 'right' && btnRight) btnRight.classList.add('required-key');
+                    else if (hazard.requiredKey === 'left' && btnLeft) btnLeft.classList.add('required-key');
+                }
                 surfaceBox.style.display = 'none';
             } else {
                 phaseBadge.className = 'fight-phase-tag';
-                const santoTag = this.gameplay.isSantoJumping ? ' 🤸 SANTO!' : '';
-                if (bal < -0.22 && phase !== 'TAP_TO_NET' && btnRight) btnRight.classList.add('required-key');
-                else if (bal > 0.22 && phase !== 'TAP_TO_NET' && btnLeft) btnLeft.classList.add('required-key');
+                const santoTag = this.gameplay.isSantoJumping ? ' • 🤸 SANTO!' : '';
+                if (showGuide) {
+                    if (bal < -0.22 && phase !== 'TAP_TO_NET' && btnRight) btnRight.classList.add('required-key');
+                    else if (bal > 0.22 && phase !== 'TAP_TO_NET' && btnLeft) btnLeft.classList.add('required-key');
 
-                if ((tension >= 0.78 || this.gameplay.isSantoJumping) && phase !== 'UNDER_PIER' && btnDown) {
-                    btnDown.classList.add('required-key');
+                    if ((tension >= 0.78 || this.gameplay.isSantoJumping) && phase !== 'UNDER_PIER' && btnDown) {
+                        btnDown.classList.add('required-key');
+                    }
                 }
 
                 if (phase === 'RUN_OUT') {
-                    phaseBadge.innerText = tension >= 0.78
-                        ? `🚨 CĂNG CƯỚC ➔ KÉO ▼ HẠ NHẢ!${santoTag}`
-                        : `▲ KÉO LÊN GHÌ CẦN + BO ◀/▶${santoTag}`;
-                    if (lblUp) lblUp.innerText = 'GHÌ LÊN';
-                    if (tension < 0.78 && btnUp) btnUp.classList.add('required-key');
+                    phaseBadge.innerText = showGuide
+                        ? (tension >= 0.78 ? `🚨 CĂNG CƯỚC ➔ KÉO ▼ HẠ NHẢ!${santoTag}` : `🎓 KÉO ▲ GHÌ LÊN + BO ◀/▶${santoTag}`)
+                        : `⏱️ ${elapsedSec}s • Cá đang phóng thẳng${santoTag}`;
+                    if (showGuide && tension < 0.78 && btnUp) btnUp.classList.add('required-key');
                     surfaceBox.style.display = 'none';
                 } else if (phase === 'UNDER_PIER') {
-                    phaseBadge.innerText = `⚠️ CHUI GẦM CẦU! KÉO ▲ LÊN NGAY (${Math.max(0, this.gameplay.underPierTimer || 0).toFixed(1)}s)`;
+                    phaseBadge.innerText = showGuide
+                        ? `⚠️ CHUI GẦM CẦU! KÉO ▲ LÊN NGAY (${Math.max(0, this.gameplay.underPierTimer || 0).toFixed(1)}s)`
+                        : `⚠️ CÁ CHUI GẦM CẦU! (${Math.max(0, this.gameplay.underPierTimer || 0).toFixed(1)}s)`;
                     phaseBadge.className = 'fight-phase-tag fight-phase-hazard';
-                    if (lblUp) lblUp.innerText = 'DỰNG GẤP!';
-                    if (btnUp) btnUp.classList.add('required-key');
+                    if (showGuide && lblUp) lblUp.innerText = 'DỰNG GẤP!';
+                    if (showGuide && btnUp) btnUp.classList.add('required-key');
                     surfaceBox.style.display = 'none';
                 } else if (phase === 'RUN_LEFT') {
-                    phaseBadge.innerText = `🐟 Cá lôi TRÁI ➔ Kéo [PHẢI ▶]${santoTag}`;
-                    if (lblUp) lblUp.innerText = 'GHÌ LÊN';
-                    if (bal <= -0.10 && btnRight) btnRight.classList.add('required-key');
+                    phaseBadge.innerText = showGuide
+                        ? `🎓 Cá lôi TRÁI ➔ Kéo [PHẢI ▶]${santoTag}`
+                        : `⏱️ ${elapsedSec}s • Cá tạt ngang Trái${santoTag}`;
+                    if (showGuide && bal <= -0.10 && btnRight) btnRight.classList.add('required-key');
                     surfaceBox.style.display = 'none';
                 } else if (phase === 'RUN_RIGHT') {
-                    phaseBadge.innerText = `🐟 Cá lôi PHẢI ➔ Kéo [◀ TRÁI]${santoTag}`;
-                    if (lblUp) lblUp.innerText = 'GHÌ LÊN';
-                    if (bal >= 0.10 && btnLeft) btnLeft.classList.add('required-key');
+                    phaseBadge.innerText = showGuide
+                        ? `🎓 Cá lôi PHẢI ➔ Kéo [◀ TRÁI]${santoTag}`
+                        : `⏱️ ${elapsedSec}s • Cá tạt ngang Phải${santoTag}`;
+                    if (showGuide && bal >= 0.10 && btnLeft) btnLeft.classList.add('required-key');
                     surfaceBox.style.display = 'none';
                 } else if (phase === 'PIN_SURFACE') {
-                    phaseBadge.innerText = '🌊 KÉO ▲ LÊN: GHÌ CÁ NGỬA BỤNG';
-                    if (lblUp) lblUp.innerText = 'GHÌ NỔI';
-                    if (btnUp) btnUp.classList.add('required-key');
+                    phaseBadge.innerText = showGuide
+                        ? '🎓 KÉO ▲ LÊN: GHÌ CÁ NGỬA BỤNG'
+                        : `⏱️ ${elapsedSec}s • Cá đã đuối sức`;
+                    if (showGuide && lblUp) lblUp.innerText = 'GHÌ NỔI';
+                    if (showGuide && btnUp) btnUp.classList.add('required-key');
                     surfaceBox.style.display = 'flex';
                     const pct = Math.round((this.gameplay.surfaceProgress || 0) * 100);
                     document.getElementById('surface-pct').innerText = `${pct}%`;
                     document.getElementById('surface-fill').style.width = `${pct}%`;
                 } else if (phase === 'TAP_TO_NET') {
-                    phaseBadge.innerText = '🕸️ BẤM TÂM TRÒN / ▼ HỚT CÁ!';
-                    if (lblUp) lblUp.innerText = 'GHÌ NỔI';
-                    if (btnDown) btnDown.classList.add('required-key');
+                    phaseBadge.innerText = showGuide
+                        ? '🎓 BẤM TÂM TRÒN / ▼ HỚT CÁ!'
+                        : '🕸️ Cá đã nổi ngửa bụng trước vợt!';
+                    if (showGuide && btnDown) btnDown.classList.add('required-key');
                     surfaceBox.style.display = 'flex';
                     document.getElementById('surface-pct').innerText = '100%';
                     document.getElementById('surface-fill').style.width = '100%';
                 }
             }
 
-            if (this.gameplay.isCounteringCorrectly || phase === 'TAP_TO_NET') {
-                dirBanner.classList.add('counter-ok');
-                dirBanner.classList.remove('counter-warn');
+            if (showGuide) {
+                if (this.gameplay.isCounteringCorrectly || phase === 'TAP_TO_NET') {
+                    dirBanner.classList.add('counter-ok');
+                    dirBanner.classList.remove('counter-warn');
+                } else {
+                    dirBanner.classList.add('counter-warn');
+                    dirBanner.classList.remove('counter-ok');
+                }
             } else {
-                dirBanner.classList.add('counter-warn');
-                dirBanner.classList.remove('counter-ok');
+                dirBanner.classList.remove('counter-ok', 'counter-warn');
             }
 
             const btnNgu = document.getElementById('btn-skill-ngulong');
@@ -5604,21 +5640,21 @@ export class UIManager {
                 const cd = this.gameplay.nguLongCooldown || 0;
                 btnNgu.disabled = cd > 0;
                 btnNgu.innerText = cd > 0 ? `🐉 ${cd.toFixed(0)}s` : '🐉 Q';
-                btnNgu.classList.toggle('skill-recommended', cd <= 0 && phase === 'RUN_OUT');
+                btnNgu.classList.toggle('skill-recommended', showGuide && cd <= 0 && phase === 'RUN_OUT');
             }
             const btnHa = document.getElementById('btn-skill-hangu');
             if (btnHa) {
                 const cd = this.gameplay.haNguCooldown || 0;
                 btnHa.disabled = cd > 0;
                 btnHa.innerText = cd > 0 ? `🌊 ${cd.toFixed(0)}s` : '🌊 C';
-                btnHa.classList.toggle('skill-recommended', cd <= 0 && phase === 'RUN_OUT');
+                btnHa.classList.toggle('skill-recommended', showGuide && cd <= 0 && phase === 'RUN_OUT');
             }
             const btnLeash = document.getElementById('btn-skill-leash');
             if (btnLeash) {
                 const avail = !!this.gameplay.safetyLeashAvailable;
                 btnLeash.disabled = !avail;
                 btnLeash.innerText = avail ? '🪢 X' : '🪢--';
-                btnLeash.classList.toggle('skill-recommended', avail && tension >= 0.78);
+                btnLeash.classList.toggle('skill-recommended', showGuide && avail && tension >= 0.78);
             }
 
             const btnNet = document.getElementById('btn-net-action');

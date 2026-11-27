@@ -3207,6 +3207,21 @@ export class FishingGameplay {
         this.fishLateralX = 0.0;
         this.surfaceProgress = 0.0;
         this.isNettingAnim = false;
+        this.fightElapsedTime = 0;
+
+        // Cá càng to bo càng lâu: Rô phi ~9-12s • Cá 5kg ~25s • Cá 10kg ~42s • Cá HUGO khủng (15-18kg) tối đa đúng 60 giây (1 phút)!
+        this.fightWeightNorm = THREE.MathUtils.clamp((finalWeight - 0.8) / 15.2, 0.0, 1.0);
+        this.expectedRunSeconds = THREE.MathUtils.lerp(7.5, 53.5, Math.pow(this.fightWeightNorm, 0.90));
+
+        // Chỉ bật màu hướng dẫn cách bo trên các nút cho ĐÚNG 1 LẦN ĐẦU TIÊN người chơi bo cá!
+        let doneFirstGuide = false;
+        try {
+            doneFirstGuide = localStorage.getItem('vn_carp_first_fight_done_v1') === '1';
+            if (!doneFirstGuide) {
+                localStorage.setItem('vn_carp_first_fight_done_v1', '1');
+            }
+        } catch (e) {}
+        this.showFightButtonGuide = !doneFirstGuide;
 
         // Khởi tạo Thanh Cân Bằng Lực Bo Trái/Phải (Cá vừa dính lưỡi sẽ lập tức tạt đầu sang một bên!)
         const initDir = isFoulHooked ? -1 : (Math.random() < 0.5 ? -1 : 1);
@@ -3313,11 +3328,13 @@ export class FishingGameplay {
         if (this.nguLongCooldown > 0) {
             return { success: false, message: `🐉 Ngự Long đang hồi chiêu (${this.nguLongCooldown.toFixed(1)}s)!` };
         }
-        this.nguLongCooldown = 6.0;
+        this.nguLongCooldown = 7.5;
         this.activeFightSkill = { type: 'NGU_LONG', timer: 1.5, elapsed: 0 };
         const isRunOut = (this.fightPhase === FIGHT_PHASES.RUN_OUT);
+        const wNorm = this.fightWeightNorm || 0;
+        const skillDrain = THREE.MathUtils.lerp(0.11, 0.032, wNorm) * (isRunOut ? 1.15 : 0.75);
         this.lineTension = Math.max(0.26, this.lineTension - (isRunOut ? 0.26 : 0.16));
-        this.fishStamina = Math.max(0.05, this.fishStamina - (isRunOut ? 0.20 : 0.12));
+        this.fishStamina = Math.max(0.04, this.fishStamina - skillDrain);
         this.fishDistance = Math.max(2.6, this.fishDistance - (isRunOut ? 1.1 : 0.5));
         this.phaseGraceTimer = 1.6;
         if (isRunOut) {
@@ -3344,11 +3361,12 @@ export class FishingGameplay {
         if (this.haNguCooldown > 0) {
             return { success: false, message: `🌊 Hạ Ngư đang hồi chiêu (${this.haNguCooldown.toFixed(1)}s)!` };
         }
-        this.haNguCooldown = 7.5;
+        this.haNguCooldown = 8.5;
         this.activeFightSkill = { type: 'HA_NGU', timer: 1.6, elapsed: 0 };
         const isRunOut = (this.fightPhase === FIGHT_PHASES.RUN_OUT);
+        const wNorm = this.fightWeightNorm || 0;
         this.lineTension = Math.max(0.22, this.lineTension - (isRunOut ? 0.34 : 0.22));
-        this.fishStamina = Math.max(0.05, this.fishStamina - 0.15);
+        this.fishStamina = Math.max(0.04, this.fishStamina - THREE.MathUtils.lerp(0.09, 0.028, wNorm));
         this.fishDistance = Math.max(2.6, this.fishDistance - (isRunOut ? 1.8 : 0.9));
         this.phaseGraceTimer = 1.8;
         if (isRunOut) {
@@ -3377,7 +3395,7 @@ export class FishingGameplay {
         this.safetyLeashAvailable = false;
         this.activeFightSkill = { type: 'SAFETY_LEASH', timer: 2.4, elapsed: 0 };
         this.lineTension = Math.max(0.18, this.lineTension - 0.52);
-        this.fishStamina = Math.max(0.05, this.fishStamina - 0.18);
+        this.fishStamina = Math.max(0.04, this.fishStamina - THREE.MathUtils.lerp(0.12, 0.04, this.fightWeightNorm || 0));
         this.phaseGraceTimer = 2.6;
         if (this.fightPhase === FIGHT_PHASES.UNDER_PIER) {
             this.fightPhase = FIGHT_PHASES.RUN_OUT;
@@ -3395,7 +3413,7 @@ export class FishingGameplay {
     }
 
     pickNextFishRun() {
-        if (this.fishStamina <= 0.25) {
+        if (this.fishStamina <= 0.08) {
             this.fightPhase = FIGHT_PHASES.PIN_SURFACE;
             return;
         }
@@ -3443,6 +3461,9 @@ export class FishingGameplay {
     updateFight(delta, keys) {
         if (this.state !== FISHING_STATES.FIGHTING || !this.hookedFish) return null;
         if (this.isNettingAnim) return { finished: false };
+
+        this.fightElapsedTime = (this.fightElapsedTime || 0) + delta;
+        const wNorm = this.fightWeightNorm || 0;
 
         if (this.nguLongCooldown > 0) this.nguLongCooldown = Math.max(0, this.nguLongCooldown - delta);
         if (this.haNguCooldown > 0) this.haNguCooldown = Math.max(0, this.haNguCooldown - delta);
@@ -3551,7 +3572,7 @@ export class FishingGameplay {
                 if (this.stakeHazard.holdTime >= this.stakeHazard.requiredHold) {
                     // BẺ LÁI THÀNH CÔNG!
                     this.stakeHazard = null;
-                    this.fishStamina = Math.max(0.04, this.fishStamina - 0.22);
+                    this.fishStamina = Math.max(0.04, this.fishStamina - THREE.MathUtils.lerp(0.14, 0.045, wNorm));
                     this.lineTension = Math.max(0.35, this.lineTension - 0.18);
                     soundManager.playWaterSplash(1.5);
                     this.bubbleSystem.spawnRipple(this.camera.position.x, this.camera.position.z, 2.0);
@@ -3631,10 +3652,14 @@ export class FishingGameplay {
             const weakestLimit = Math.min(rodLimit, mainLimit, leaderLimit);
             const overloadMul = fishW > weakestLimit ? (1.0 + Math.min(1.6, ((fishW - weakestLimit) / weakestLimit) * 1.15)) : 1.0;
 
-            // Độ bền cần câu (0–100%): Giảm khi quá tải cần hoặc để căng dây > 80% liên tục!
-            if (this.rigConfig && (this.lineTension > 0.80 || fishW > rodLimit)) {
+            // Tốc độ bào sức cá tỉ lệ chuẩn theo cân nặng (Rô phi ~9-12s, cá vừa ~20-30s, cá củ ~40-48s, HUGO ~55-60s tối đa 1 phút!)
+            const expectedRunSec = Math.max(7.5, this.expectedRunSeconds || 22.0);
+            const optimalDrainRate = (0.92 / expectedRunSec) * rodDrainMul;
+
+            // Độ bền cần câu (0–100%): Chỉ hao mòn đáng kể khi để dây căng đỏ (> 82%) hoặc quá tải nặng!
+            if (this.rigConfig && (this.lineTension > 0.82 || (fishW > rodLimit * 1.35 && this.lineTension > 0.70))) {
                 const curDur = typeof this.rigConfig.rodDurability === 'number' ? this.rigConfig.rodDurability : 100;
-                const wearRate = (fishW > rodLimit ? 3.2 : 1.4) * (this.lineTension > 0.86 ? 1.8 : 1.0);
+                const wearRate = (this.lineTension > 0.88 ? 2.4 : 0.85) * (fishW > rodLimit ? 1.35 : 1.0);
                 this.rigConfig.rodDurability = Math.max(0, Number((curDur - wearRate * delta).toFixed(2)));
                 if (this.rigConfig.rodDurability <= 0) {
                     soundManager.stopLineSingLoop();
@@ -3707,69 +3732,72 @@ export class FishingGameplay {
             }
 
             if (!keyDown && this.fightPhase === FIGHT_PHASES.RUN_OUT) {
-                const pullScale = keyUp ? (0.65 + 0.35 * Math.max(0.25, vertInput)) : 0;
+                const pullScale = keyUp ? (0.72 + 0.36 * Math.max(0.25, vertInput)) : 0;
                 if (inSweetSpot && keyUp) {
                     isCounteringCorrectly = true;
-                    this.fishStamina -= (0.31 + (1 - power) * 0.09) * pullScale * rodDrainMul * delta;
-                    this.fishDistance = Math.max(2.3, this.fishDistance - 0.68 * pullScale * delta);
+                    this.fishStamina -= optimalDrainRate * pullScale * delta;
+                    this.fishDistance = Math.max(2.3, this.fishDistance - THREE.MathUtils.lerp(0.62, 0.24, wNorm) * pullScale * delta);
                     if (this.lineTension <= 0.80) {
                         this.lineTension += (0.52 - this.lineTension) * delta * 3.6;
                     }
-                    actionFeedback = '✅ CÂN BẰNG LỰC CHUẨN + GHÌ LÊN ▲! Cá đang mỏi nhanh!';
+                    actionFeedback = '✅ CÂN BẰNG LỰC CHUẨN + GHÌ LÊN ▲! Cá đang mỏi dần!';
                 } else if (inSweetSpot) {
                     isCounteringCorrectly = true;
-                    this.fishStamina -= (0.19 + (1 - power) * 0.06) * rodDrainMul * delta;
-                    this.fishDistance = Math.min(11.5, this.fishDistance + 0.12 * delta);
+                    this.fishStamina -= optimalDrainRate * 0.65 * delta;
+                    this.fishDistance = Math.min(11.5, this.fishDistance + 0.10 * delta);
                     this.lineTension += (0.46 - this.lineTension) * delta * 3.0;
-                    actionFeedback = '⚖️ Cân bằng tốt! Kéo [▲ GHÌ LÊN] trên vòng tròn để thu cá vào bờ!';
+                    actionFeedback = '⚖️ Cân bằng tốt!';
                 } else if (inDangerEdge) {
+                    this.fishStamina -= optimalDrainRate * 0.18 * delta;
                     this.fishDistance = Math.min(12.0, this.fishDistance + (0.55 + power * 0.25) * delta);
                     this.lineTension += (tensionClimbRate * 1.55 + 0.05) * delta;
-                    actionFeedback = this.forceBalance < 0
-                        ? '🚨 LỆCH TRÁI NẶNG! Kéo sang PHẢI ▶ ngay kẻo nổ thẻo!'
-                        : '🚨 LỆCH PHẢI NẶNG! Kéo sang TRÁI ◀ ngay kẻo nổ thẻo!';
+                    actionFeedback = '🚨 LỆCH CÂN BẰNG NẶNG!';
                 } else {
-                    this.fishStamina -= (keyUp ? 0.14 : 0.05) * rodDrainMul * delta;
-                    this.fishDistance = Math.min(11.5, this.fishDistance + (keyUp ? -0.15 : 0.35) * delta);
+                    this.fishStamina -= optimalDrainRate * (keyUp ? 0.50 : 0.28) * delta;
+                    this.fishDistance = Math.min(11.5, this.fishDistance + (keyUp ? -0.12 : 0.30) * delta);
                     this.lineTension += tensionClimbRate * 0.75 * delta;
-                    actionFeedback = this.forceBalance < 0
-                        ? '⚖️ Kéo chéo [▶ PHẢI + ▲ LÊN] đưa vạch về giữa & ghì cá!'
-                        : '⚖️ Kéo chéo [◀ TRÁI + ▲ LÊN] đưa vạch về giữa & ghì cá!';
+                    actionFeedback = '⚖️ Đang giằng co lực...';
                 }
             } else if (!keyDown && (this.fightPhase === FIGHT_PHASES.RUN_LEFT || this.fightPhase === FIGHT_PHASES.RUN_RIGHT)) {
                 const isActivelyCounterLeaning = (this.forceBalance < -0.20 && keyRight) || (this.forceBalance > 0.20 && keyLeft);
                 if (inSweetSpot) {
                     isCounteringCorrectly = true;
-                    const liftBonus = keyUp ? 0.09 : 0.0;
-                    this.fishStamina -= (0.29 + liftBonus + (1 - power) * 0.09) * rodDrainMul * delta;
-                    this.fishDistance = Math.max(2.3, this.fishDistance - (keyUp ? 0.66 : 0.45) * delta);
+                    const liftMul = keyUp ? 1.12 : 0.90;
+                    this.fishStamina -= optimalDrainRate * liftMul * delta;
+                    this.fishDistance = Math.max(2.3, this.fishDistance - THREE.MathUtils.lerp(0.58, 0.22, wNorm) * (keyUp ? 1.0 : 0.7) * delta);
                     if (this.lineTension <= 0.80) {
                         this.lineTension += ((keyUp ? 0.52 : 0.45) - this.lineTension) * delta * 3.8;
                     }
-                    actionFeedback = '🎯 CÂN BẰNG LỰC HOÀN HẢO! Cần cong chữ C dìu đầu cá quay lại!';
+                    actionFeedback = '🎯 CÂN BẰNG LỰC HOÀN HẢO!';
                 } else if (isActivelyCounterLeaning) {
                     isCounteringCorrectly = true;
-                    this.fishStamina -= (0.21 + (1 - power) * 0.07) * rodDrainMul * delta;
-                    this.fishDistance = Math.max(2.3, this.fishDistance - (keyUp ? 0.34 : 0.22) * delta);
+                    this.fishStamina -= optimalDrainRate * 0.76 * delta;
+                    this.fishDistance = Math.max(2.3, this.fishDistance - THREE.MathUtils.lerp(0.32, 0.14, wNorm) * delta);
                     if (this.lineTension <= 0.80) {
                         this.lineTension += (0.56 - this.lineTension) * delta * 3.0;
                     }
-                    actionFeedback = '✊ Đang mở bát ghì cần kéo vạch cân bằng về tâm xanh!';
+                    actionFeedback = '✊ Đang mở bát ghì cần dìu đầu cá!';
                 } else if (inDangerEdge) {
+                    this.fishStamina -= optimalDrainRate * 0.18 * delta;
                     this.fishDistance = Math.min(12.0, this.fishDistance + (0.48 + power * 0.25) * delta);
                     this.lineTension += (tensionClimbRate * 1.65 + 0.055) * delta;
-                    actionFeedback = this.forceBalance < 0
-                        ? '🚨 CÁ LÔI THẲNG CẦN TRÁI! Kéo [▶ BO PHẢI] ngay!'
-                        : '🚨 CÁ LÔI THẲNG CẦN PHẢI! Kéo [◀ BO TRÁI] ngay!';
+                    actionFeedback = '🚨 CẦN ĐANG BỊ LÔI THẲNG!';
                 } else {
+                    this.fishStamina -= optimalDrainRate * 0.32 * delta;
                     this.lineTension += tensionClimbRate * 0.90 * delta;
-                    actionFeedback = this.forceBalance < 0
-                        ? '⬅️ Cá lôi TRÁI — Kéo [▶ BO PHẢI] cân bằng lực!'
-                        : '➡️ Cá lôi PHẢI — Kéo [◀ BO TRÁI] cân bằng lực!';
+                    actionFeedback = '⚖️ Đang giằng co ngang...';
                 }
             }
 
-            if (this.fishStamina <= 0.24) {
+            // Trần thời gian bo tối đa cho cá HUGO là 1 phút (60 giây): Từ giây 54 trở đi cá kiệt sức hẳn để kịp ngửa bụng ở mốc <= 60s!
+            if (this.fightElapsedTime >= 54.0) {
+                this.fishStamina -= 0.18 * delta;
+            }
+            if (this.fightElapsedTime >= 58.5) {
+                this.fishStamina = Math.min(this.fishStamina, 0.06);
+            }
+
+            if (this.fishStamina <= 0.08) {
                 this.fightPhase = FIGHT_PHASES.PIN_SURFACE;
                 soundManager.playWaterSplash(1.2);
             }
@@ -3786,7 +3814,7 @@ export class FishingGameplay {
                 actionFeedback = `⬆️ ĐANG DỰNG THẲNG CẦN CHẶN ĐẦU CÁ! Giữ thêm ${Math.max(0, 0.95 - this.underPierHold).toFixed(1)}s!`;
 
                 if (this.underPierHold >= 0.95) {
-                    this.fishStamina = Math.max(0.05, this.fishStamina - 0.18);
+                    this.fishStamina = Math.max(0.05, this.fishStamina - THREE.MathUtils.lerp(0.12, 0.04, wNorm));
                     this.fishDistance = Math.max(4.2, this.fishDistance + 1.5);
                     this.fightPhase = FIGHT_PHASES.RUN_OUT;
                     this.phaseTimer = 4.5;
@@ -3842,17 +3870,19 @@ export class FishingGameplay {
                 return { finished: true, snapped: true, message: pierMsg };
             }
         } else if (this.fightPhase === FIGHT_PHASES.PIN_SURFACE) {
-            this.fishStamina = Math.max(0.04, this.fishStamina - 0.05 * delta);
+            this.fishStamina = Math.max(0.0, this.fishStamina - 0.03 * delta);
             this.fishLateralX += (0 - this.fishLateralX) * delta * 2.5;
             this.fishDistance += (2.35 - this.fishDistance) * delta * 2.2;
+            const surfRate = this.fightElapsedTime >= 59.0 ? 0.95 : THREE.MathUtils.lerp(0.50, 0.175, wNorm);
 
-            if (keyUp) {
+            if (keyUp || this.fightElapsedTime >= 60.0) {
                 isCounteringCorrectly = true;
-                this.surfaceProgress = Math.min(1.0, this.surfaceProgress + 0.58 * delta);
+                this.surfaceProgress = Math.min(1.0, this.surfaceProgress + surfRate * delta);
                 this.lineTension += (0.56 - this.lineTension) * delta * 4.0;
-                actionFeedback = `🌊 Đang ghì cá trồi lên mặt nước ngửa bụng đớp khí... (${Math.round(this.surfaceProgress * 100)}%)`;
+                actionFeedback = `🌊 Đang ghì cá nổi lên mặt nước... (${Math.round(this.surfaceProgress * 100)}%)`;
 
-                if (this.surfaceProgress >= 1.0) {
+                if (this.surfaceProgress >= 1.0 || this.fightElapsedTime >= 60.5) {
+                    this.surfaceProgress = 1.0;
                     this.fightPhase = FIGHT_PHASES.TAP_TO_NET;
                     this.landingNetGroup.visible = true;
                     soundManager.playWaterSplash(1.1);
