@@ -283,6 +283,20 @@ export const BAIT_SHOP_ITEMS = [
         maxFishWeight: 35
     },
     {
+        id: 'float_ho_dau',
+        name: 'Phao Hố Đấu Chuyên Dụng (Tăm Đậu Ngắn 4 Nấc • Chân Dài)',
+        brand: BRANDS.EQUIPMENT,
+        category: 'float',
+        isHoDauFloat: true,
+        unitLabel: 'quả',
+        packSizeLabel: '1 quả',
+        price: 165000,
+        icon: '⚓',
+        description: 'BẮT BUỘC SỞ HỮU ĐỂ ĐÁNH CÂU HỐ ĐẤU! Bầu Nano ngắn mập trọng tâm thấp + chân Carbon siêu dài + tăm rỗng 4 nấc to bản đứng 2,2 nấc, báo nhịp chép bấm & thụt đen mất hình cực đanh!',
+        sensitivity: 99,
+        visibleMarks: 4
+    },
+    {
         id: 'float_kl_co',
         name: 'Phao Cỏ Chép Củ Kim Long',
         brand: BRANDS.EQUIPMENT,

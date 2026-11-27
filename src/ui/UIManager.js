@@ -53,6 +53,11 @@ export class UIManager {
         // Hệ thống 7 Trang Bị Câu Đài & Bộ Set Cần / Cân Phao / Trục / Thẻo
         this.equipmentLevels = this.loadEquipmentLevels();
         this.rigConfig = this.loadRigConfig();
+        this.rigConfig.hasHoDauFloat = this.hasHoDauFloat();
+        if (this.rigConfig.fishingStyle === 'HO_DAU' && !this.rigConfig.hasHoDauFloat) {
+            this.rigConfig.fishingStyle = 'CAN_DAI';
+            this.saveRigConfig();
+        }
         this.worldMarketTab = 'gear';
         this.worldListings = INITIAL_WORLD_MARKET_LISTINGS.map(x => ({ ...x }));
         this.ownedLakes = this.loadOwnedLakes();
@@ -716,12 +721,12 @@ export class UIManager {
                         <button class="btn-close" id="btn-close-shop">&times;</button>
                     </div>
                     <div class="shop-tabs">
-                        <button class="tab-btn active" data-tab="all">Tất Cả (12 Loại Mồi & Hương)</button>
+                        <button class="tab-btn active" data-tab="all">Tất Cả Kệ Hàng</button>
                         <button class="tab-btn" data-tab="${BRANDS.BASE_CAM}">🌾 Cám Nền (35k/kg)</button>
                         <button class="tab-btn" data-tab="${BRANDS.NATURAL_BAIT}">🌽🐚 Ngô (10k) & Ốc (20k)</button>
                         <button class="tab-btn" data-tab="${BRANDS.FLAVOR_CAM}">🍯 Hương Pha Cám</button>
                         <button class="tab-btn" data-tab="${BRANDS.FLAVOR_SPECIAL}">🍶🧪 Rượu Thuốc Bắc & Nước Xanh</button>
-                        <button class="tab-btn" data-tab="${BRANDS.EQUIPMENT}">🎣 Cần & Phao</button>
+                        <button class="tab-btn" data-tab="${BRANDS.EQUIPMENT}">🎣 Cần & Phao (Có Phao Hố Đấu)</button>
                     </div>
                     <div class="shop-item-grid" id="shop-items-container"></div>
                 </div>
@@ -783,7 +788,8 @@ export class UIManager {
                         </div>
 
                         <div class="rig-section">
-                            <div class="rig-sec-title">2. 📍 CHỌN KIỂU CÂN PHAO & MÔ PHỎNG BỂ CÂN NƯỚC 1:1</div>
+                            <div class="rig-sec-title">2. 📍 LỐI ĐÁNH & KIỂU CÂN PHAO (MÔ PHỎNG BỂ CÂN NƯỚC 1:1)</div>
+                            <div id="rig-style-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px;"></div>
                             <div class="rig-calib-showcase">
                                 <div class="rig-calib-left">
                                     <div class="rig-calibs-grid" id="rig-calibs-grid"></div>
@@ -2066,7 +2072,30 @@ export class UIManager {
         return true;
     }
 
+    hasHoDauFloat() {
+        return !!(this.playerInventory && (this.playerInventory.float_ho_dau || 0) >= 1);
+    }
+
+    promptNeedHoDauFloatFromShop() {
+        const msg = '⚓ CHƯA CÓ PHAO HỐ ĐẤU! Khi câu Hố Đấu bạn phải vào Cửa Hàng (🏪 Tiệm Đồ - kệ Cần & Phao) mua [Phao Hố Đấu Chuyên Dụng - 165.000đ] nhé!';
+        this.showPrompt(msg);
+        this.showScenarioToast(
+            '⚓ BẮT BUỘC MUA PHAO HỐ ĐẤU TRONG CỬA HÀNG!',
+            'Câu Hố Đấu (trục xiên 45°, tăm ngắn đứng 2,2 nấc) bắt buộc phải dùng [Phao Hố Đấu Chuyên Dụng]. Đã mở sẵn kệ Cần & Phao trong Cửa Hàng để bạn mua!',
+            'WARN'
+        );
+        this.closeMixModal();
+        this.closeRigModal();
+        this.openShopModal(BRANDS.EQUIPMENT);
+    }
+
     handleAttemptCast() {
+        // Bắt buộc phải mua Phao Hố Đấu trong Cửa Hàng nếu đang chọn lối đánh Câu Hố Đấu
+        if (this.rigConfig && this.rigConfig.fishingStyle === 'HO_DAU' && !this.hasHoDauFloat()) {
+            this.promptNeedHoDauFloatFromShop();
+            return;
+        }
+
         // Kiểm tra kho Trục & Thẻo trước khi vung cần
         if (this.gameplay && typeof this.gameplay.hasValidRigToCast === 'function') {
             const rigCheck = this.gameplay.hasValidRigToCast();
@@ -2311,12 +2340,16 @@ export class UIManager {
         }
     }
 
-    openShopModal() {
+    openShopModal(initialTab = 'all') {
         document.exitPointerLock();
         soundManager.playClick();
         document.getElementById('modal-shop').style.display = 'flex';
         this.renderShopTabs();
-        this.renderShopItems('all');
+        const targetTab = initialTab || 'all';
+        document.querySelectorAll('.shop-tabs .tab-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.getAttribute('data-tab') === targetTab);
+        });
+        this.renderShopItems(targetTab);
     }
 
     closeShopModal() {
@@ -2835,7 +2868,37 @@ export class UIManager {
             };
         });
 
-        // 2. Render 11 kiểu Cân Phao
+        // 2A. Render 3 Lối Đánh (Câu Cân Đài • Câu Bán Đấu • Câu Hố Đấu bắt buộc có Phao Hố Đấu)
+        const rigStyleEl = document.getElementById('rig-style-grid');
+        if (rigStyleEl) {
+            const ownHD = this.hasHoDauFloat();
+            const curSt = this.rigConfig.fishingStyle || 'CAN_DAI';
+            rigStyleEl.innerHTML = FISHING_STYLES.map(st => {
+                const active = st.id === curSt;
+                const lockedHD = st.id === 'HO_DAU' && !ownHD;
+                const subTag = st.id === 'HO_DAU'
+                    ? (ownHD ? '✅ Đã có Phao Hố Đấu' : '🔒 Mua Phao Hố Đấu ở Tiệm')
+                    : (st.id === 'BAN_DAU' ? 'Giấu thẻo 50%' : 'Trục thẳng đứng');
+                return `<button class="rig-calib-btn ${active ? 'active' : ''}" data-rig-style="${st.id}" style="padding:7px 8px;${lockedHD ? 'border-color:#f59e0b88;opacity:0.92;' : ''}"><div><b>${st.label}</b></div><div style="font-size:10px;color:${lockedHD ? '#fbbf24' : '#cbd5e1'};margin-top:2px;">${subTag}</div></button>`;
+            }).join('');
+            rigStyleEl.querySelectorAll('[data-rig-style]').forEach(btn => {
+                btn.onclick = () => {
+                    const nextStyle = btn.getAttribute('data-rig-style');
+                    if (nextStyle === 'HO_DAU' && !this.hasHoDauFloat()) {
+                        this.promptNeedHoDauFloatFromShop();
+                        return;
+                    }
+                    soundManager.playClick();
+                    this.rigConfig.fishingStyle = nextStyle;
+                    this.rigConfig.hasHoDauFloat = this.hasHoDauFloat();
+                    this.saveRigConfig();
+                    if (this.gameplay && this.gameplay.applyRigSetup) this.gameplay.applyRigSetup(this.rigConfig);
+                    this.renderRigModal();
+                };
+            });
+        }
+
+        // 2B. Render 15 kiểu Cân Phao
         calibsEl.innerHTML = FLOAT_CALIBRATIONS.map(c => {
             const active = this.rigConfig.calibrationId === c.id;
             return `<button class="rig-calib-btn ${active ? 'active' : ''}" data-calib-id="${c.id}">${c.label}</button>`;
@@ -3208,24 +3271,31 @@ export class UIManager {
             if (filter === 'all') return true;
             return item.brand === filter;
         });
+        // Đưa Phao Hố Đấu Chuyên Dụng lên đầu kệ Thiết Bị để người chơi tìm mua ngay lập tức
+        filtered.sort((a, b) => (b.isHoDauFloat ? 1 : 0) - (a.isHoDauFloat ? 1 : 0));
 
         filtered.forEach(item => {
             const ownedCount = Number((this.playerInventory[item.id] || 0).toFixed(2));
             const unitTxt = item.unitLabel ? ` ${item.unitLabel}` : (item.category === 'flavor' ? ' chai' : '');
             const isCorn = item.id === 'ngo_ngot';
+            const isHoDau = !!item.isHoDauFloat;
             const card = document.createElement('div');
             card.className = 'shop-card';
+            if (isHoDau) {
+                card.style.border = '1.5px solid #f59e0b';
+                card.style.boxShadow = '0 0 18px rgba(245, 158, 11, 0.22)';
+            }
             card.innerHTML = `
                 <div class="card-icon shop-svg-icon">${renderShopItemSVG(item)}</div>
                 <div class="card-info">
-                    <div class="card-title">${item.name}</div>
+                    <div class="card-title">${item.name} ${isHoDau ? `<span style="display:inline-block;margin-left:6px;padding:2px 7px;border-radius:999px;font-size:10px;font-weight:800;background:${ownedCount >= 1 ? 'rgba(34,197,94,0.22)' : 'rgba(245,158,11,0.25)'};color:${ownedCount >= 1 ? '#4ade80' : '#fde047'};border:1px solid ${ownedCount >= 1 ? '#22c55e' : '#f59e0b'};">${ownedCount >= 1 ? '✅ ĐÃ MỞ KHÓA HỐ ĐẤU' : '⚓ BẮT BUỘC CHO HỐ ĐẤU'}</span>` : ''}</div>
                     <div class="card-brand">${item.brand} ${item.volume || item.hardness ? '• ' + (item.volume || item.hardness) : ''}</div>
                     <div class="card-desc">${item.description}</div>
                     <div class="card-bottom">
                         <span class="card-price">${item.price.toLocaleString()} đ${item.packSizeLabel ? ' / ' + item.packSizeLabel : ''}</span>
                         <span class="card-owned">Kho: <b>${ownedCount}${unitTxt}</b></span>
                         <div style="display:flex;gap:5px;flex-wrap:wrap;">
-                            <button class="btn-buy" id="buy-${item.id}">Mua +1</button>
+                            <button class="btn-buy" id="buy-${item.id}">${isHoDau ? (ownedCount >= 1 ? 'Mua dự phòng +1' : '⚓ Mua Phao Hố Đấu') : 'Mua +1'}</button>
                             ${isCorn ? `<button class="btn-buy" id="buy10-${item.id}" style="background:linear-gradient(135deg,#d97706,#b45309);">+10 bắp (100k)</button>` : ''}
                         </div>
                     </div>
@@ -3237,8 +3307,22 @@ export class UIManager {
                 if (this.playerMoney >= item.price) {
                     this.playerMoney -= item.price;
                     this.playerInventory[item.id] = Number(((this.playerInventory[item.id] || 0) + 1).toFixed(2));
+                    if (isHoDau && this.rigConfig) {
+                        this.rigConfig.hasHoDauFloat = true;
+                        this.saveRigConfig();
+                        if (this.gameplay && this.gameplay.applyRigSetup) {
+                            this.gameplay.applyRigSetup(this.rigConfig);
+                        }
+                        soundManager.playUpgradeSuccess();
+                        this.showScenarioToast(
+                            '⚓ ĐÃ SỞ HỮU PHAO HỐ ĐẤU CHUYÊN DỤNG!',
+                            'Bạn đã mua [Phao Hố Đấu Tăm Ngắn 4 Nấc]! Giờ bạn có thể chọn [⚓ Câu Hố Đấu] trong Chậu Pha Mồi (M) hoặc Set Trục/Phao (G)!',
+                            'GOLD'
+                        );
+                    } else {
+                        soundManager.playClick();
+                    }
                     this.updateMoneyUI();
-                    soundManager.playClick();
                     this.renderShopItems(filter);
                 } else {
                     this.showScenarioToast('💰 THIẾU TIỀN', `Cần ${item.price.toLocaleString()}đ để mua [${item.name}]!`, 'WARN');
@@ -3302,18 +3386,31 @@ export class UIManager {
         const curCalId = (this.rigConfig && this.rigConfig.calibrationId) ? this.rigConfig.calibrationId : 'can7_cau3';
         const curStyleId = (this.rigConfig && this.rigConfig.fishingStyle) ? this.rigConfig.fishingStyle : 'CAN_DAI';
 
-        // 3A. Hàng chọn Lối Đánh Độc Lập (Câu Cân Đài / Câu Bán Đấu / Câu Hố Đấu giấu thẻo)
+        // 3A. Hàng chọn Lối Đánh Độc Lập (Câu Cân Đài / Câu Bán Đấu / Câu Hố Đấu bắt buộc mua Phao Hố Đấu ở Cửa Hàng)
         const styleGrid = document.getElementById('mix-style-grid');
         if (styleGrid) {
+            const ownHD = this.hasHoDauFloat();
             styleGrid.innerHTML = FISHING_STYLES.map(st => {
                 const active = st.id === curStyleId;
-                return `<button class="mix-calib-btn ${active ? 'active' : ''}" data-style-id="${st.id}" title="${st.desc}" style="${active ? '' : `border-color:${st.color}66;`}"><div>${st.label}</div><div style="font-size:9.5px;opacity:0.85;">${st.id === 'CAN_DAI' ? 'Trục thẳng' : (st.id === 'BAN_DAU' ? 'Giấu thẻo 50%' : 'Giấu thẻo 85%')}</div></button>`;
+                const lockedHD = st.id === 'HO_DAU' && !ownHD;
+                const subLabel = st.id === 'CAN_DAI'
+                    ? 'Trục thẳng'
+                    : (st.id === 'BAN_DAU'
+                        ? 'Giấu thẻo 50%'
+                        : (ownHD ? 'Phao Hố Đấu ✓' : '🔒 Mua Phao ở Tiệm (B)'));
+                return `<button class="mix-calib-btn ${active ? 'active' : ''}" data-style-id="${st.id}" title="${st.desc}" style="${active ? '' : `border-color:${st.color}66;`}"><div>${st.label}</div><div style="font-size:9.5px;opacity:0.92;color:${lockedHD ? '#fde047' : 'inherit'};">${subLabel}</div></button>`;
             }).join('');
             styleGrid.querySelectorAll('.mix-calib-btn').forEach(btn => {
                 btn.onclick = () => {
+                    const chosenStyle = btn.getAttribute('data-style-id');
+                    if (chosenStyle === 'HO_DAU' && !this.hasHoDauFloat()) {
+                        this.promptNeedHoDauFloatFromShop();
+                        return;
+                    }
                     soundManager.playClick();
                     if (this.rigConfig) {
-                        this.rigConfig.fishingStyle = btn.getAttribute('data-style-id');
+                        this.rigConfig.fishingStyle = chosenStyle;
+                        this.rigConfig.hasHoDauFloat = this.hasHoDauFloat();
                         this.saveRigConfig();
                         if (this.gameplay && this.gameplay.applyRigSetup) {
                             this.gameplay.applyRigSetup(this.rigConfig);

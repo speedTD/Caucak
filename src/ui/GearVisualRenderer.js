@@ -347,6 +347,23 @@ export function renderShopItemSVG(item = {}) {
         return renderRodModelSVG({ rodColor: cMap, accentColor: 0xfacc15, secondaryAccent: 0xef4444, length: item.length, hardness: item.hardness }, 132, 46);
     }
     if (item.category === 'float') {
+        if (item.id === 'float_ho_dau' || item.isHoDauFloat) {
+            return `
+            <svg viewBox="0 0 56 96" width="50" height="88" xmlns="http://www.w3.org/2000/svg">
+                <!-- Tăm rỗng ngắn 4 nấc to bản chuyên Hố Đấu -->
+                <rect x="25.2" y="6" width="5.6" height="5.5" rx="2" fill="#ff2a00"/>
+                <rect x="25.5" y="12.5" width="5.0" height="5.2" rx="1" fill="#facc15"/>
+                <rect x="25.6" y="18.7" width="4.8" height="5.2" rx="1" fill="#00ff66"/>
+                <rect x="25.8" y="24.9" width="4.4" height="5.2" rx="1" fill="#ff5500"/>
+                <!-- Bầu ngắn mập trọng tâm thấp sơn đỏ đô carbon -->
+                <ellipse cx="28" cy="40" rx="8.2" ry="10.5" fill="#991b1b" stroke="#facc15" stroke-width="1.3"/>
+                <ellipse cx="26" cy="37" rx="2.4" ry="5.5" fill="rgba(255,255,255,0.28)"/>
+                <!-- Chân Carbon siêu dài Hố Đấu + Chân cắm khóa đồng -->
+                <line x1="28" y1="50.5" x2="28" y2="86" stroke="#0f172a" stroke-width="2.4" stroke-linecap="round"/>
+                <rect x="26.2" y="83" width="3.6" height="5.5" rx="1" fill="#dc2626"/>
+                <circle cx="28" cy="90.5" r="2" fill="none" stroke="#facc15" stroke-width="1.2"/>
+            </svg>`;
+        }
         const sh = item.id && item.id.includes('co') ? 'SLIM_REED' : (item.id && item.id.includes('led') ? 'SHORT_HEAVY' : 'TEARDROP');
         return renderFloatModelSVG({ shape: sh, tipMarks: item.visibleMarks || 11, ledBiteColor: sh === 'SHORT_HEAVY' }, 48, 86);
     }

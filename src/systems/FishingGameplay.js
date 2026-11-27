@@ -1930,14 +1930,30 @@ export class FishingGameplay {
         this.activeMainLineSpec = getLineSpec(rigConfig.mainLineSize);
         this.activeLeaderSpec = getLineSpec(rigConfig.leaderSize);
 
-        // 1. Điều chỉnh độ nổi mặt nước (equilibriumFloatY) CHÍNH XÁC TỪNG MILIMET theo hình học tăm phao 11 nấc (markHeight = 0.032m, đỉnh tăm y = 0.352m):
-        // Để nổi chính xác N nấc trên mặt nước (y = 0): equilibriumFloatY = -0.352 + N * 0.032
+        // 1. Khi chọn Câu Hố Đấu: Tự động lắp Phao Hố Đấu Chuyên Dụng (Bầu ngắn mập, chân dài, tăm rỗng ngắn 4 nấc đứng 2,2 nấc)!
         const isHoDau = rigConfig.fishingStyle === 'HO_DAU';
+        if (isHoDau) {
+            this.rebuildFloat3DGeometry({
+                shape: 'SHORT_HEAVY',
+                tipMarks: 4,
+                tipHeight: 0.176,
+                tipRadius: 0.0082,
+                isHoDauFloat: true,
+                ledBiteColor: !!(this.equipBonuses && this.equipBonuses.ledBiteColor)
+            });
+        } else if (this.equipBonuses && this.equipBonuses.float) {
+            this.rebuildFloat3DGeometry(this.equipBonuses.float);
+        }
+        this.updateFloatLedGlow(false);
+
+        // Điều chỉnh độ nổi mặt nước (equilibriumFloatY) CHÍNH XÁC TỪNG MILIMET theo đúng chiều cao vạch tăm hiện tại!
+        const tipH = this.currentFloatTipHeight || 0.352;
+        const markH = this.currentMarkHeight || 0.032;
         const marks = isHoDau ? 2.2 : (this.activeCalibration ? this.activeCalibration.visibleMarks : 3);
-        this.equilibriumFloatY = THREE.MathUtils.clamp(-0.352 + marks * 0.032, -0.325, 0.005);
+        this.equilibriumFloatY = THREE.MathUtils.clamp(-tipH + marks * markH, -0.335, 0.005);
         const pipTag = document.getElementById('pip-float-status');
         if (pipTag && this.activeCalibration) {
-            pipTag.innerText = isHoDau ? '⚓ Hố Đấu (2,2 nấc)' : this.activeCalibration.shortTag;
+            pipTag.innerText = isHoDau ? '⚓ Phao Hố Đấu (2,2/4 nấc)' : this.activeCalibration.shortTag;
         }
 
         // 2. Xác định Cần đang cầm (Cần Vô Danh 3m6 tải 5kg / Cần Trúc 5m4 tải 7kg / hoặc Cần đã nâng cấp trong Xưởng)
@@ -1976,6 +1992,13 @@ export class FishingGameplay {
 
     hasValidRigToCast() {
         if (!this.rigConfig) return { ok: true };
+        if (this.rigConfig.fishingStyle === 'HO_DAU' && !this.rigConfig.hasHoDauFloat) {
+            return {
+                ok: false,
+                missing: 'HO_DAU_FLOAT',
+                message: '⚓ CHƯA CÓ PHAO HỐ ĐẤU! Khi câu Hố Đấu bạn phải vào Cửa Hàng (🏪 Tiệm Đồ - Phím B, mục Cần & Phao) mua [Phao Hố Đấu Chuyên Dụng] trước nhé!'
+            };
+        }
         const dur = typeof this.rigConfig.rodDurability === 'number' ? this.rigConfig.rodDurability : 100;
         if (dur <= 0) {
             return { ok: false, missing: 'ROD_BROKEN', message: '💥 CẦN ĐANG BỊ GÃY LÓNG (Độ bền 0%)! Hãy mở [⚙️ Set Trục/Phao] để Thay Lóng Cần (150.000đ)!' };
@@ -2026,10 +2049,19 @@ export class FishingGameplay {
                 this.floatTipsGroup.remove(c);
             }
             const count = flt.tipMarks || 11;
+            const isHoDauFloat = !!flt.isHoDauFloat;
+            const tipHeight = flt.tipHeight || (isHoDauFloat ? 0.176 : 0.352);
             const rawR = flt.tipRadius || 0.0046;
-            // Tỷ lệ đường kính tăm phao thanh mảnh chân thực (2.6mm - 5.2mm, mắt ngọn phình nhẹ chống lóa)
-            const baseR = THREE.MathUtils.clamp(rawR * 0.62, 0.0018, 0.0046);
-            const markH = 0.352 / count;
+            // Phao Hố Đấu dùng tăm rỗng ngắn to bản (~5.2mm) dễ nhìn từ xa; phao đài thường thanh mảnh chuẩn thực tế (2.6mm - 4.6mm)
+            const baseR = isHoDauFloat
+                ? 0.0049
+                : THREE.MathUtils.clamp(rawR * 0.62, 0.0018, 0.0046);
+            const markH = tipHeight / count;
+            this.currentFloatTipHeight = tipHeight;
+            this.currentMarkHeight = markH;
+            if (this.floatCarbonLeg) {
+                this.floatCarbonLeg.scale.y = isHoDauFloat ? 1.22 : 1.0;
+            }
             this.floatTipMats = [];
             this.floatOriginalTipColors = [];
             this.floatOledSheathMats = [];
@@ -2863,11 +2895,11 @@ export class FishingGameplay {
         this.bubbleSystem.spawnCarpBubbles(this.floatTargetPos.x, this.floatTargetPos.z, true, true);
         this.bubbleSystem.spawnRipple(this.floatTargetPos.x, this.floatTargetPos.z, 0.68);
 
-        const tipMarks = (this.equipBonuses && this.equipBonuses.float && this.equipBonuses.float.tipMarks)
-            ? this.equipBonuses.float.tipMarks
-            : 11;
-        const markH = 0.352 / tipMarks;
-        const pressedMarks = Number((2.0 + Math.random() * 1.0).toFixed(1)); // Bấm đúng 2.0 - 3.0 vạch phao!
+        const isHoDauMode = !!(this.rigConfig && this.rigConfig.fishingStyle === 'HO_DAU');
+        const markH = this.currentMarkHeight || 0.032;
+        const pressedMarks = isHoDauMode
+            ? Number((1.6 + Math.random() * 0.5).toFixed(1)) // Phao Hố Đấu đứng 2.2 nấc -> bấm 1.6-2.1 nấc sát mặt nước!
+            : Number((2.0 + Math.random() * 1.0).toFixed(1)); // Bấm đúng 2.0 - 3.0 vạch phao!
         const pressDepth = pressedMarks * markH;
         const holdDuration = Number((3.0 + Math.random() * 2.0).toFixed(2)); // Giữ nguyên vạch 3.0 - 5.0 giây!
         const key = (nearestFish && nearestFish.speciesKey) ? nearestFish.speciesKey : 'CARP';
@@ -3126,70 +3158,82 @@ export class FishingGameplay {
             scenario = 'FLOAT_PRESS';
             willCommit = false; // Cá sặc mùi chỉ quẹt dây chứ không cắn mồi!
         } else {
-            // Phân bổ kịch bản theo đặc trưng sinh học từng loài & LỐI ĐÁNH (Câu Cân Đài / Bán Đấu / Hố Đấu giấu thẻo)
+            // Phân bổ kịch bản CHUẨN NHỊP CHÉP BẤM ĂN ĐỜI THỰC theo từng loài & LỐI ĐÁNH (Câu Cân Đài / Bán Đấu / Hố Đấu)
             const curStyle = (this.rigConfig && this.rigConfig.fishingStyle) ? this.rigConfig.fishingStyle : 'CAN_DAI';
-            let scenarios = ['LIFT', 'SUBMERGE', 'MORTAR', 'SNAP_HOLD', 'TWO_STEP', 'SKATE_RUN'];
+            // Mặc định Cá Chép đánh đài chuẩn: 75% là nhịp CHÉP BẤM ĐỐN KHẨU (SNAP_HOLD & TWO_STEP) + Đội chì Bềnh phao (LIFT) + Đen phao (SUBMERGE)
+            let scenarios = ['SNAP_HOLD', 'SNAP_HOLD', 'SNAP_HOLD', 'TWO_STEP', 'TWO_STEP', 'LIFT', 'SUBMERGE'];
             if (curStyle === 'HO_DAU') {
-                // Câu Hố Đấu (trục xiên 45°, giấu thẻo sát đáy): Tỷ lệ cá GIÃ GẠO (MORTAR) & MẤT HÌNH PHAO (SUBMERGE) rất cao!
-                scenarios = ['SUBMERGE', 'SUBMERGE', 'SUBMERGE', 'MORTAR', 'MORTAR', 'MORTAR', 'TWO_STEP', 'LIFT'];
+                // Câu Hố Đấu (Phao tăm ngắn đứng 2,2 nấc, trục xiên 45°): Đặc trưng Chép Bấm Sập Gọn, Giã Gạo rồi Bấm Sập & Đen Phao Mất Hình!
+                scenarios = ['SNAP_HOLD', 'SNAP_HOLD', 'SUBMERGE', 'SUBMERGE', 'MORTAR', 'MORTAR', 'TWO_STEP'];
             } else if (curStyle === 'BAN_DAU') {
-                // Câu Bán Đấu (trục hơi xiên, giấu thẻo nhẹ): Tỷ lệ giã gạo & mất hình phao cao hơn câu cân đài
-                scenarios = ['SUBMERGE', 'SUBMERGE', 'MORTAR', 'MORTAR', 'TWO_STEP', 'LIFT', 'SNAP_HOLD'];
+                scenarios = ['SNAP_HOLD', 'SNAP_HOLD', 'TWO_STEP', 'SUBMERGE', 'SUBMERGE', 'MORTAR', 'LIFT'];
             } else if (key === 'TILAPIA') {
-                scenarios = ['MORTAR', 'MORTAR', 'SNAP_HOLD', 'LIFT', 'TWO_STEP'];
+                scenarios = ['MORTAR', 'MORTAR', 'SNAP_HOLD', 'SNAP_HOLD', 'TWO_STEP'];
             } else if (key === 'BLACK_CARP') {
-                scenarios = ['SUBMERGE', 'SUBMERGE', 'SNAP_HOLD', 'TWO_STEP'];
+                scenarios = ['SNAP_HOLD', 'SNAP_HOLD', 'SUBMERGE', 'SUBMERGE', 'TWO_STEP'];
             } else if (key === 'GRASS_CARP') {
-                scenarios = ['SKATE_RUN', 'SKATE_RUN', 'SUBMERGE', 'TWO_STEP', 'LIFT'];
+                scenarios = ['SNAP_HOLD', 'TWO_STEP', 'SKATE_RUN', 'SUBMERGE', 'LIFT'];
             } else if (key === 'OLD_CARP') {
-                scenarios = ['TWO_STEP', 'TWO_STEP', 'SNAP_HOLD', 'LIFT', 'SUBMERGE'];
+                scenarios = ['SNAP_HOLD', 'SNAP_HOLD', 'TWO_STEP', 'TWO_STEP', 'LIFT', 'SUBMERGE'];
             }
             scenario = scenarios[Math.floor(Math.random() * scenarios.length)];
         }
 
-        // Thiết lập các giai đoạn (stages) và thời lượng chuẩn từng kịch bản
+        const isHoDau = !!(this.rigConfig && this.rigConfig.fishingStyle === 'HO_DAU');
+        // Số vạch cá chép bấm sập dứt khoát (Đốn khẩu): Phao đài thường bấm 1.3 - 2.4 vạch; Phao Hố Đấu tăm ngắn đứng 2.2 nấc bấm 1.2 - 1.9 vạch!
+        const snapMarks = isHoDau
+            ? Number((1.2 + Math.random() * 0.7).toFixed(2))
+            : Number((1.35 + Math.random() * 1.05).toFixed(2));
+        const preLiftMarks = Number((0.25 + Math.random() * 0.22).toFixed(2)); // Cá vào kê mồm quạt vây trả nhẹ 0.25-0.45 vạch trước khi bấm!
+
+        // Thiết lập các giai đoạn (stages) chuẩn động học cá chép thực tế
         let stages = [];
         if (scenario === 'LIFT') {
-            // Nhịp PHAO BỀNH CẢ CỦ: khi đã bềnh cả củ thì chắc chắn cá đã đội chì nuốt gọn (100% dính cá!)
+            // Nhịp CHÉP ĐỘI CHÌ BỀNH PHAO: Cá chúc đầu tì mồi nhún nhẹ nửa vạch -> khựng 0.2s -> ngẩng đầu nhấc chì bềnh cao từng nấc (100% dính cá!)
             willCommit = true;
             stages = [
-                { name: 'NIBBLE', duration: (0.7 + Math.random() * 0.6) * Math.min(2.0, slow) },
-                { name: 'LIFTING', duration: (2.2 + Math.random() * 1.2) * Math.min(2.0, slow) }
+                { name: 'NIBBLE', duration: (0.58 + Math.random() * 0.28) * Math.min(1.6, slow) },
+                { name: 'LIFTING', duration: (2.2 + Math.random() * 1.0) * Math.min(2.0, slow) }
             ];
         } else if (scenario === 'SUBMERGE') {
-            // Nhịp PHAO MẤT HÌNH: phao tụt lút biến mất dưới mặt nước — tỷ lệ đóng dính cá 50/50!
+            // Nhịp CHÉP CỦ / HỐ ĐẤU BẤM ĐEN MẤT HÌNH: Rùng báo cá -> Bấm sập 1.4 vạch rồi trì thẳng đứng lút sạch tăm (50/50!)
             willCommit = true;
             stages = [
-                { name: 'TREMOR', duration: (0.45 + Math.random() * 0.35) * Math.min(1.8, slow) },
-                { name: 'PLUNGE', duration: (1.8 + Math.random() * 1.0) * Math.min(2.0, slow) }
+                { name: 'TREMOR', duration: (0.50 + Math.random() * 0.28) * Math.min(1.6, slow) },
+                { name: 'PLUNGE', duration: (1.85 + Math.random() * 0.95) * Math.min(2.0, slow) }
             ];
         } else if (scenario === 'FLOAT_PRESS') {
-            // ĐÈ PHAO: Cá sục bùn cày tăm -> Phao chìm từ từ dần xuống -> Xong lại từ từ nổi lên!
+            // ĐÈ PHAO DO NẶNG MÙI: Cá sục bùn cày tăm -> Phao chìm từ từ dần xuống -> Xong lại từ từ nổi lên!
             stages = [
                 { name: 'PECK_MUD', duration: 1.4 + Math.random() * 0.5 },
                 { name: 'SLOW_SINK', duration: 2.6 + Math.random() * 0.7 },
                 { name: 'SLOW_RISE', duration: 2.3 + Math.random() * 0.6 }
             ];
         } else if (scenario === 'MORTAR') {
+            // GIÃ GẠO HỐ ĐẤU / TRANH MỒI: Nhấp bấm rời rạc 3-5 nhịp thẳng đứng -> BẤM SẬP ĐỨNG VẠCH!
             stages = [
-                { name: 'PECKING', duration: (2.4 + Math.random() * 1.8) * Math.min(1.8, slow) },
-                { name: 'TAKE_OR_SPIT', duration: (1.8 + Math.random() * 0.8) }
+                { name: 'PECKING', duration: (1.75 + Math.random() * 0.95) * Math.min(1.6, slow) },
+                { name: 'TAKE_OR_SPIT', duration: (1.85 + Math.random() * 0.85) }
             ];
         } else if (scenario === 'SNAP_HOLD') {
+            // NHỊP CHÉP BẤM ĐỐN KHẨU KINH ĐIỂN: Rờ mồi trả nhẹ nửa vạch -> Khựng tăm nín thở -> BẤM TỰT DỨT KHOÁT ĐỨNG KHỰNG VẠCH!
             stages = [
-                { name: 'SNAP', duration: 0.18 },
-                { name: 'HOLD', duration: (2.0 + Math.random() * 1.0) * Math.min(2.0, slow) }
+                { name: 'PRE_BREATHE', duration: 0.55 + Math.random() * 0.30 },
+                { name: 'DEAD_PAUSE', duration: (0.36 + Math.random() * 0.28) * Math.min(1.6, slow) },
+                { name: 'SNAP', duration: 0.085 },
+                { name: 'HOLD', duration: (1.85 + Math.random() * 0.95) * Math.min(2.0, slow) }
             ];
         } else if (scenario === 'TWO_STEP') {
+            // NHỊP CHÉP ĂN 2 NHỊP: Nhấp thử nửa vạch -> Đứng im nín thở -> BẤM TỰT SÂU 2 VẠCH ĐỨNG KHỰNG!
             stages = [
-                { name: 'STEP1', duration: 0.8 + Math.random() * 0.4 },
-                { name: 'PAUSE', duration: (1.4 + Math.random() * 0.8) * Math.min(2.0, slow) },
-                { name: 'STEP2', duration: (1.8 + Math.random() * 1.0) }
+                { name: 'STEP1', duration: 0.46 + Math.random() * 0.16 },
+                { name: 'PAUSE', duration: (0.65 + Math.random() * 0.50) * Math.min(1.8, slow) },
+                { name: 'STEP2', duration: (1.85 + Math.random() * 0.95) }
             ];
         } else if (scenario === 'SKATE_RUN') {
             stages = [
-                { name: 'TILT', duration: 0.6 + Math.random() * 0.3 },
-                { name: 'SKATE', duration: (2.0 + Math.random() * 1.2) * Math.min(2.0, slow) }
+                { name: 'TILT', duration: 0.5 + Math.random() * 0.25 },
+                { name: 'SKATE', duration: (1.9 + Math.random() * 1.0) * Math.min(2.0, slow) }
             ];
         }
 
@@ -3201,6 +3245,8 @@ export class FishingGameplay {
             willCommit,
             isTakeWindow: false,
             speciesKey: key,
+            snapMarks,
+            preLiftMarks,
             driftX: 0,
             driftZ: 0,
             rippleTimer: 0,
@@ -3213,6 +3259,24 @@ export class FishingGameplay {
         this.biteMaxTime = 1;
         this.biteTimer = 1;
         this.bitePromptText = '';
+    }
+
+    // Đường cong vật lý cú HÚT BẤM ĐỐN KHẨU ("TỰT!") chuẩn cá chép ngoài đời thực:
+    // Gia tốc sập thẳng đứng cực nhanh trong ~0.085s, hơi dội thủy lực 12% rồi ghì khựng đanh nét tại đúng vạch mới!
+    carpSnapDisplacement(elapsed, snapDur = 0.085) {
+        if (elapsed <= 0) return 0;
+        if (elapsed < snapDur) {
+            const u = elapsed / snapDur;
+            return (1.0 - Math.pow(1.0 - u, 3.0)) * 1.12;
+        }
+        const settleDur = 0.105;
+        if (elapsed < snapDur + settleDur) {
+            const v = (elapsed - snapDur) / settleDur;
+            const ease = v * v * (3.0 - 2.0 * v);
+            return 1.12 - 0.12 * ease;
+        }
+        // Đứng khựng đanh gọn tại đúng vạch bấm (chỉ rung cực vi mô 1.5% do cá đang ngậm nhai mồi trong vòm họng)
+        return 1.0 + Math.sin((elapsed - snapDur - settleDur) * 6.5) * 0.015;
     }
 
     advanceBiteScript(delta) {
@@ -3347,8 +3411,12 @@ export class FishingGameplay {
                 earlyMsg = `⚠️ Giật quá sớm! Cá đang GIÃ GẠO rỉa ngoài mép mồi chưa nuốt — ${scared} con cá tản ổ!`;
             } else if (scenario === 'TWO_STEP' && (curStage === 'STEP1' || curStage === 'PAUSE')) {
                 earlyMsg = `⚠️ Giật non ở nhịp 1! Cá mới nhấm thử chưa kịp sang nhịp 2 — ${scared} con cá giật mình bỏ đi!`;
+            } else if (scenario === 'SNAP_HOLD' && (curStage === 'PRE_BREATHE' || curStage === 'DEAD_PAUSE')) {
+                earlyMsg = `⚠️ Giật non! Cá chép mới kê mồm quạt vây trả nửa mục chưa kịp BẤM VẠCH — ${scared} con cá tản ổ!`;
+            } else if (scenario === 'SNAP_HOLD' && !s.willCommit) {
+                earlyMsg = `⚠️ Giật trúng nhịp cá nhấp hờ (chưa đứng vạch) — ${scared} con cá giật mình bỏ đi!`;
             } else if (scenario === 'SNAP_HOLD' && curStage === 'SNAP') {
-                earlyMsg = `⚠️ Giật quá vội khi phao chưa kịp bấm giữ im — cá giật mình nhả mồi!`;
+                earlyMsg = `⚠️ Giật hơi vội trước khi cá hút hết nhịp bấm — cá giật mình nhả mồi!`;
             } else if (scenario === 'LIFT' && curStage === 'NIBBLE') {
                 earlyMsg = `⚠️ Giật non khi phao chưa kịp bềnh lên — lưỡi chưa vào hàm!`;
             } else {
@@ -3390,9 +3458,9 @@ export class FishingGameplay {
         } else if (s.scenario === 'MORTAR') {
             praiseText = 'Đóng chuẩn sau chuỗi GIÃ GẠO! Bắt đúng nhịp đè dứt khoát!';
         } else if (s.scenario === 'SNAP_HOLD') {
-            praiseText = 'Cú giật đỉnh cao đúng nhịp PHAO BẤM 1 NẤC RỒI GIỮ IM!';
+            praiseText = `🎯 BẮT TRỌN NHỊP CHÉP BẤM ĐỐN KHẨU (${(s.snapMarks || 1.6).toFixed(1)} vạch đứng khựng)! Đóng đinh hàm trên!`;
         } else if (s.scenario === 'TWO_STEP') {
-            praiseText = 'Bắt trọn NHỊP 2 sau khoảng lặng nín thở! Đóng ngập hàm!';
+            praiseText = '🎯 BẮT TRỌN NHỊP CHÉP BẤM LẦN 2 SAU KHOẢNG LẶNG NÍN THỞ! Đóng ngập hàm!';
         } else if (s.scenario === 'SKATE_RUN') {
             praiseText = 'Đóng đúng lúc CÁ LƯỚT CHẠY PHAO RẼ NƯỚC!';
         }
@@ -5188,9 +5256,11 @@ export class FishingGameplay {
                 }
             }
 
-            // Khi mồi tan hết (isBareHook), mất trọng lượng viên mồi nên tăm phao trồi cao lên +0.026m (2 mắt phao)
-            const bareHookRise = this.isBareHook ? 0.026 : (1.0 - this.hookBaitIntegrity) * 0.012;
-            const waveY = Math.sin(this.floatBobAngle) * 0.0045;
+            // Khi mồi tan hết (isBareHook), mất trọng lượng viên mồi nên tăm phao trồi cao lên ~1-1.5 mắt phao;
+            // bình thường phao câu đài / hố đấu đã dìm cước sẽ đứng thẳng tắp, mặt nước chỉ thở cực êm (~1mm) để nhìn rõ từng nhịp chép bấm!
+            const markHWait = this.currentMarkHeight || 0.032;
+            const bareHookRise = this.isBareHook ? (markHWait * 1.15) : (1.0 - this.hookBaitIntegrity) * (markHWait * 0.35);
+            const waveY = Math.sin(this.floatBobAngle * 0.75) * 0.0011;
             this.floatGroup.position.set(
                 fPos.x,
                 this.equilibriumFloatY + bareHookRise + this.floatVerticalOffset + waveY,
@@ -5199,12 +5269,12 @@ export class FishingGameplay {
             this.floatGroup.rotation.order = 'YXZ';
             this.floatGroup.rotation.y = baseFloatYaw;
             this.floatGroup.rotation.x = 0;
-            this.floatGroup.rotation.z = Math.sin(this.floatBobAngle * 0.8) * 0.032;
+            this.floatGroup.rotation.z = Math.sin(this.floatBobAngle * 0.55) * 0.004;
 
             if (this.floatMeniscusRing) {
                 this.floatMeniscusRing.visible = true;
                 this.floatMeniscusRing.position.set(fPos.x, 0.005, fPos.z);
-                const pulse = 0.62 + Math.sin(this.floatBobAngle * 1.5) * 0.06;
+                const pulse = 0.62 + Math.sin(this.floatBobAngle * 1.2) * 0.035;
                 this.floatMeniscusRing.scale.set(pulse, pulse, 1);
             }
 
@@ -5227,8 +5297,8 @@ export class FishingGameplay {
                 this.updateFloatLedGlow(false);
                 this.resolveBiteEnded(endReason);
             } else if (s) {
-                this.updateFloatLedGlow(!!s.isTakeWindow);
                 const eq = this.equilibriumFloatY;
+                const markH = this.currentMarkHeight || 0.032;
                 const curStage = s.stages[s.stageIndex];
                 const stageName = curStage ? curStage.name : '';
                 const dur = curStage ? curStage.duration : 1;
@@ -5237,145 +5307,182 @@ export class FishingGameplay {
                 let rotZ = 0;
                 s.isTakeWindow = false;
 
-                // 0. Kịch bản ĐẶC TRƯNG KÍCH MỒI: CÁ BẤM 2-3 VẠCH PHAO & GIỮ NGUYÊN VẠCH 3-5 GIÂY (Giật là lụm 100%, không giật cá nhả mồi!)
+                // 0. Kịch bản ĐẶC TRƯNG KÍCH MỒI: CÁ CHÉP BẤM GỌN 2-3 VẠCH & ĐỨNG KHỰNG VẠCH 3-5 GIÂY (Giật là lụm 100%)
                 if (s.scenario === 'TWITCH_HOLD') {
-                    const depth = s.pressDepth || 0.08;
+                    const depth = s.pressDepth || (2.4 * markH);
                     if (stageName === 'PRESS_DOWN') {
-                        // Cá hút gọn viên mồi vừa nhử -> phao sập gọn đúng 2-3 vạch!
-                        y = eq - depth * k;
-                        rotZ = -0.04 * k;
-                        s.isTakeWindow = (s.stageTime >= 0.06);
+                        const snapK = this.carpSnapDisplacement(s.stageTime, 0.085);
+                        y = eq - depth * Math.min(1.12, snapK);
+                        rotZ = 0;
+                        s.isTakeWindow = (s.stageTime >= 0.045);
                     } else if (stageName === 'HOLD_BARS') {
-                        // Giữ nguyên đứng im ở vạch đã bấm suốt 3-5 giây chờ cần thủ giật!
-                        y = eq - depth;
+                        const settleK = this.carpSnapDisplacement(0.18 + s.stageTime, 0.085);
+                        y = eq - depth * settleK;
                         rotZ = 0;
                         s.isTakeWindow = true;
                     }
                 }
-                // 1. Kịch bản: PHAO BỀNH CẢ CỦ (LIFT — Tỷ lệ dính cá 100%!)
+                // 1. Kịch bản: CHÉP ĐỘI CHÌ BỀNH PHAO TỪNG NẤC (LIFT — Tỷ lệ dính cá 100%!)
                 else if (s.scenario === 'LIFT') {
                     if (stageName === 'NIBBLE') {
-                        const pulse = Math.sin(s.stageTime * 12);
-                        y = eq - Math.max(0, pulse) * 0.015;
-                        rotZ = pulse * 0.03;
+                        // Cá chúc đầu tì môi hút mồi làm phao bấm nhẹ xuống 0.5 vạch rồi khựng chuẩn bị đội chì!
+                        const dipEnv = k < 0.65 ? Math.sin((k / 0.65) * Math.PI * 0.5) : 1.0;
+                        y = eq - dipEnv * (0.48 * markH);
+                        rotZ = 0;
                     } else if (stageName === 'LIFTING') {
-                        // Bềnh cao lộ hẳn cả bầu/củ phao lên mặt nước và ngả nghiêng rõ rệt (100% dính cá!)
-                        const lift = Math.min(0.24, 0.04 + k * 0.22);
-                        y = eq + lift;
-                        rotZ = Math.min(0.76, k * 0.72);
-                        s.isTakeWindow = (s.stageTime >= 0.28);
-                        s.driftX += delta * 0.05;
+                        // Cá ngẩng đầu nhấc chì: tăm phao đội đầm từ tốn thẳng đứng lên từng vạch một (+3.5 -> +5.2 vạch)
+                        const easeLift = 1.0 - Math.pow(1.0 - k, 1.85);
+                        const liftDist = (-0.48 + easeLift * 5.2) * markH;
+                        y = eq + liftDist;
+                        // Chỉ hơi ngả nhẹ khi cổ bầu phao đã trồi hẳn sát mặt nước
+                        const bodyEmerged = Math.max(0, (y + 0.03) / 0.14);
+                        rotZ = Math.min(0.32, bodyEmerged * 0.28);
+                        s.isTakeWindow = (s.stageTime >= 0.22);
                     }
                 }
-                // 2. Kịch bản: CÁ CẮN MẤT HÌNH (SUBMERGE — Phao tụt lút mất hình, tỷ lệ dính cá 50/50!)
+                // 2. Kịch bản: CHÉP CỦ / HỐ ĐẤU BẤM ĐEN MẤT HÌNH (SUBMERGE — Tỷ lệ dính cá 50/50!)
                 else if (s.scenario === 'SUBMERGE') {
                     if (stageName === 'TREMOR') {
-                        y = eq - Math.abs(Math.sin(s.stageTime * 18)) * 0.009;
-                        rotZ = Math.sin(s.stageTime * 15) * 0.04;
+                        // Rùng nhẹ báo cá to tì vây vào thẻo rồi khựng im 0.2s trước cú hút
+                        const rEnv = k < 0.68 ? Math.sin((k / 0.68) * Math.PI * 2.0) * 0.26 * markH : 0;
+                        y = eq - Math.abs(rEnv);
+                        rotZ = 0;
                     } else if (stageName === 'PLUNGE') {
-                        // Thụt lút mất hình phao biến mất hoàn toàn dưới mặt nước
-                        const sink = Math.min(0.32, 0.06 + s.stageTime * 0.34);
-                        y = eq - sink;
-                        rotZ = -0.34;
-                        s.driftX += delta * 0.42;
-                        s.driftZ += delta * 0.22;
-                        s.isTakeWindow = (s.stageTime >= 0.16);
+                        // Đầu tiên BẤM SẬP dứt khoát 1.4 vạch trong 0.085s, khựng 0.12s rồi trì thẳng đứng đen sạch toàn bộ tăm phao!
+                        let sinkMarks = 0;
+                        if (s.stageTime < 0.20) {
+                            sinkMarks = 1.45 * this.carpSnapDisplacement(s.stageTime, 0.085);
+                        } else {
+                            const pullT = s.stageTime - 0.20;
+                            sinkMarks = 1.45 + Math.min(6.5, pullT * 4.8);
+                        }
+                        y = eq - sinkMarks * markH;
+                        rotZ = -0.024; // Rút thẳng đứng chuẩn phao đài, không đổ rạp ngang!
+                        s.driftX += delta * 0.045;
+                        s.driftZ += delta * 0.025;
+                        s.isTakeWindow = (s.stageTime >= 0.06);
                     }
                 }
-                // 3. Kịch bản: CÁ GIÃ GẠO PHAO (MORTAR)
+                // 3. Kịch bản: GIÃ GẠO HỐ ĐẤU / ĐÀN CÁ TRANH MỒI ➔ BẤM SẬP ĐỨNG VẠCH (MORTAR)
                 else if (s.scenario === 'MORTAR') {
                     if (stageName === 'PECKING') {
-                        // Nhấp nhấp thụt thụt liên hồi dồn dập
-                        const cycle = s.stageTime * 15;
-                        const dip = Math.abs(Math.sin(cycle));
-                        y = eq - dip * 0.025;
-                        rotZ = Math.sin(cycle) * 0.07;
+                        // Nhịp giã gạo thực tế (~2.3 nhịp/giây): mỗi nhịp bấm thẳng đứng 0.65 vạch nhanh rồi nảy trả về, có nhịp nghỉ ngắn!
+                        const period = 0.43;
+                        const localT = s.stageTime % period;
+                        let peck = 0;
+                        if (localT < 0.085) {
+                            peck = (localT / 0.085);
+                        } else if (localT < 0.30) {
+                            const r = (localT - 0.085) / 0.215;
+                            peck = 1.0 - r * r * (3 - 2 * r);
+                        }
+                        y = eq - peck * (0.68 * markH);
+                        rotZ = 0;
                         s.rippleTimer -= delta;
-                        if (s.rippleTimer <= 0 && dip > 0.85) {
-                            s.rippleTimer = 0.22;
-                            this.bubbleSystem.spawnRipple(fPos.x + s.driftX, fPos.z + s.driftZ, 0.4);
+                        if (s.rippleTimer <= 0 && peck > 0.85) {
+                            s.rippleTimer = 0.38;
+                            this.bubbleSystem.spawnRipple(fPos.x + s.driftX, fPos.z + s.driftZ, 0.36);
                         }
                     } else if (stageName === 'TAKE_OR_SPIT') {
                         if (s.willCommit) {
-                            // Sau chuỗi giã gạo, đè tụt hẳn 2-3 nấc!
-                            y = eq - Math.min(0.14, 0.04 + s.stageTime * 0.16);
-                            rotZ = -0.25;
-                            s.driftX += delta * 0.35;
-                            s.isTakeWindow = true;
+                            // Sau chuỗi giã gạo: cá nuốt gọn viên mồi -> BẤM SẬP ĐỨNG KHỰNG VẠCH!
+                            const snapM = (s.snapMarks || 1.8) * this.carpSnapDisplacement(s.stageTime, 0.085);
+                            y = eq - snapM * markH;
+                            rotZ = 0;
+                            s.isTakeWindow = (s.stageTime >= 0.04);
                         } else {
-                            // Giã gạo thưa dần rồi phao đứng im (móm)
-                            const dip = Math.abs(Math.sin(s.stageTime * 7)) * 0.015 * (1 - k);
-                            y = eq - dip;
+                            const fade = (1.0 - k) * 0.32 * markH * Math.max(0, Math.sin(s.stageTime * 6.5));
+                            y = eq - fade;
+                            rotZ = 0;
                         }
                     }
                 }
-                // 4. Kịch bản: CÁ BẤM XUỐNG 1 NẤC RỒI GIỮ (SNAP_HOLD)
+                // 4. Kịch bản CHỦ ĐẠO: NHỊP CHÉP BẤM ĐỐN KHẨU KINH ĐIỂN (SNAP_HOLD)
+                // Rờ mồi trả nhẹ 0.35 vạch ➔ Khựng tăm nín thở ➔ "TỰT!" bấm thẳng đứng 1.3-2.4 vạch rồi đứng khựng đanh nét!
                 else if (s.scenario === 'SNAP_HOLD') {
-                    if (stageName === 'SNAP') {
-                        // Tụt dứt khoát đúng 1 nấc (~2.8cm)
-                        y = eq - (0.028 * k);
+                    const preLift = (s.preLiftMarks || 0.32) * markH;
+                    const targetSnap = (s.snapMarks || 1.65) * markH;
+                    if (stageName === 'PRE_BREATHE') {
+                        const easeIn = k * k * (3 - 2 * k);
+                        y = eq + preLift * easeIn;
+                        rotZ = 0;
+                    } else if (stageName === 'DEAD_PAUSE') {
+                        // Khoảnh khắc vàng báo hiệu trước cú bấm: tăm phao khựng đứng im phăng phắc!
+                        y = eq + preLift;
+                        rotZ = 0;
+                    } else if (stageName === 'SNAP') {
+                        if (s.willCommit) {
+                            const snapK = this.carpSnapDisplacement(s.stageTime, 0.085);
+                            y = (eq + preLift) - (preLift + targetSnap) * Math.min(1.12, snapK);
+                            rotZ = 0;
+                            s.isTakeWindow = (s.stageTime >= 0.045);
+                        } else {
+                            // Nhấp giả (hút hờ ngoài môi): chỉ nháy nhẹ 0.45 vạch
+                            y = (eq + preLift) - (preLift + 0.45 * markH) * k;
+                            rotZ = 0;
+                        }
                     } else if (stageName === 'HOLD') {
                         if (s.willCommit) {
-                            // GIỮ NGUYÊN VỊ TRÍ TỤT 1 NẤC ĐÓ, im phăng phắc!
-                            y = eq - 0.028;
+                            // ĐỨNG KHỰNG ĐANH NÉT TẠI VẠCH ĐÃ BẤM (Chuẩn "đốn khẩu" cá chép!)
+                            const settleK = this.carpSnapDisplacement(0.085 + s.stageTime, 0.085);
+                            y = (eq + preLift) - (preLift + targetSnap) * settleK;
                             rotZ = 0;
-                            s.isTakeWindow = (s.stageTime >= 0.15);
+                            s.isTakeWindow = true;
                         } else {
-                            // Giữ 1 lúc rồi từ từ nhả mồi nổi lại
-                            if (s.stageTime < 1.0) {
-                                y = eq - 0.028;
-                            } else {
-                                const rel = Math.min(1, (s.stageTime - 1.0) / 1.0);
-                                y = eq - 0.028 * (1 - rel);
-                            }
+                            // Nhấp hờ móm: nảy trả ngay về mực cân trong 0.28s đầu chứ không giữ vạch!
+                            const rebound = Math.min(1, s.stageTime / 0.28);
+                            const easeR = rebound * rebound * (3 - 2 * rebound);
+                            y = (eq - 0.45 * markH) * (1 - easeR) + eq * easeR;
+                            rotZ = 0;
                         }
                     }
                 }
-                // 5. Kịch bản: CÁ ĂN 2 NHỊP (TWO_STEP)
+                // 5. Kịch bản: CHÉP ĂN 2 NHỊP — NHẤP THỬ MỒI ➔ KHỰNG NÍN THỞ ➔ BẤM SÂU ĐỨNG VẠCH (TWO_STEP)
                 else if (s.scenario === 'TWO_STEP') {
+                    const targetSnap2 = ((s.snapMarks || 1.7) + 0.25) * markH;
                     if (stageName === 'STEP1') {
-                        // Nhịp 1: nhấp nhẹ 1 phát rồi thôi
-                        const pulse = Math.sin(k * Math.PI);
-                        y = eq - pulse * 0.024;
-                        rotZ = pulse * 0.06;
+                        // Nhịp 1: cá thổi thử viên mồi — phao bấm nhẹ nửa vạch rồi êm trả về mực cân
+                        const tap = k < 0.35 ? (k / 0.35) : (1.0 - (k - 0.35) / 0.65);
+                        y = eq - Math.max(0, tap) * (0.58 * markH);
+                        rotZ = 0;
                     } else if (stageName === 'PAUSE') {
-                        // Khoảng lặng nín thở: phao đứng im phăng phắc!
+                        // Khoảng lặng nín thở: phao đứng thẳng tắp im phăng phắc!
                         y = eq;
                         rotZ = 0;
                     } else if (stageName === 'STEP2') {
                         if (s.willCommit) {
-                            // Nhịp 2: bất ngờ đè tụt sâu 2-3 nấc!
-                            y = eq - Math.min(0.14, 0.03 + s.stageTime * 0.15);
-                            rotZ = -0.22;
-                            s.driftX += delta * 0.3;
-                            s.isTakeWindow = true;
+                            // Nhịp 2: BẤM TỰT DỨT KHOÁT 1.8 - 2.6 vạch thẳng đứng rồi giữ ghì chặt!
+                            const snapK = this.carpSnapDisplacement(s.stageTime, 0.085);
+                            const extraCreep = s.stageTime > 0.85 ? Math.min(0.45 * markH, (s.stageTime - 0.85) * 0.35 * markH) : 0;
+                            y = eq - targetSnap2 * snapK - extraCreep;
+                            rotZ = 0;
+                            s.isTakeWindow = (s.stageTime >= 0.045);
                         } else {
-                            // Nhịp 2 không cắn (móm)
-                            y = eq + Math.sin(s.stageTime * 8) * 0.007 * (1 - k);
+                            y = eq + Math.sin(s.stageTime * 7) * (0.16 * markH) * (1 - k);
+                            rotZ = 0;
                         }
                     }
                 }
-                // 6. Kịch bản: CÁ LƯỚT CHẠY PHAO / XÉ NƯỚC (SKATE_RUN)
+                // 6. Kịch bản: TRẮM CỎ / CHÉP ĂN LỬNG BẤM RỒI DẪN PHAO ĐI NGANG (SKATE_RUN)
                 else if (s.scenario === 'SKATE_RUN') {
                     if (stageName === 'TILT') {
-                        rotZ = -0.25 * k;
+                        y = eq - (0.65 * markH) * k;
+                        rotZ = -0.06 * k;
                     } else if (stageName === 'SKATE') {
                         if (s.willCommit) {
-                            // Phao nghiêng xé nước lướt chạy ngang
-                            rotZ = -0.32;
-                            s.driftX += delta * 0.48;
-                            s.driftZ += delta * 0.24;
-                            y = eq - 0.025;
+                            rotZ = -0.10;
+                            s.driftX += delta * 0.26;
+                            s.driftZ += delta * 0.14;
+                            y = eq - 1.15 * markH;
                             s.isTakeWindow = true;
                             s.rippleTimer -= delta;
                             if (s.rippleTimer <= 0) {
-                                s.rippleTimer = 0.25;
-                                this.bubbleSystem.spawnRipple(fPos.x + s.driftX, fPos.z + s.driftZ, 0.5);
+                                s.rippleTimer = 0.28;
+                                this.bubbleSystem.spawnRipple(fPos.x + s.driftX, fPos.z + s.driftZ, 0.45);
                             }
                         } else {
-                            rotZ = -0.2 * (1 - k);
-                            s.driftX += delta * 0.12 * (1 - k);
-                            y = eq;
+                            rotZ = -0.05 * (1 - k);
+                            y = eq - (0.65 * markH) * (1 - k);
                         }
                     }
                 }
@@ -5384,37 +5491,34 @@ export class FishingGameplay {
                     const flavorDrops = s.flavorDrops || 8;
                     const maxSink = 0.065 + Math.min(0.045, (flavorDrops - 6) * 0.007);
                     if (stageName === 'PECK_MUD') {
-                        // Rung nhẹ do đàn cá sục tăm cày ổ
-                        const jitter = Math.sin(s.stageTime * 16) * 0.003;
+                        const jitter = Math.sin(s.stageTime * 14) * 0.0025;
                         y = eq + jitter;
-                        rotZ = Math.sin(s.stageTime * 8) * 0.02;
+                        rotZ = 0;
                         s.rippleTimer -= delta;
                         if (s.rippleTimer <= 0) {
                             s.rippleTimer = 0.42;
                             this.bubbleSystem.spawnCarpBubbles(fPos.x + (Math.random() - 0.5) * 0.12, fPos.z + (Math.random() - 0.5) * 0.12, true, false);
                         }
                     } else if (stageName === 'SLOW_SINK') {
-                        // PHAO CHÌM TỪ TỪ DẦN XUỐNG: Cá quẹt vây đè dây thẻo
                         const progress = Math.sin(k * Math.PI * 0.5);
                         y = eq - progress * maxSink;
-                        rotZ = -0.10 * progress;
-                        s.isTakeWindow = false; // Cá không nuốt mồi!
+                        rotZ = -0.04 * progress;
+                        s.isTakeWindow = false;
 
-                        // Cá cày nhiều tăm liên tục xung quanh chân phao
                         s.rippleTimer -= delta;
                         if (s.rippleTimer <= 0) {
                             s.rippleTimer = 0.5;
                             this.bubbleSystem.spawnCarpBubbles(fPos.x + (Math.random() - 0.5) * 0.15, fPos.z + (Math.random() - 0.5) * 0.15, true, false);
                         }
                     } else if (stageName === 'SLOW_RISE') {
-                        // XONG LẠI TỪ TỪ NỔI LÊN: Cá bơi qua khỏi dây
                         const progress = Math.cos(k * Math.PI * 0.5);
                         y = eq - progress * maxSink;
-                        rotZ = -0.10 * progress;
+                        rotZ = -0.04 * progress;
                         s.isTakeWindow = false;
                     }
                 }
 
+                this.updateFloatLedGlow(!!s.isTakeWindow);
                 this.floatGroup.position.set(fPos.x + s.driftX, y, fPos.z + s.driftZ);
                 this.floatGroup.rotation.z = rotZ;
             }
@@ -5444,20 +5548,18 @@ export class FishingGameplay {
                     lookY = THREE.MathUtils.lerp(0.03, 0.08, t);
                 } else {
                     const t = Math.min(1.0, (this.castElapsed - 2.15) / 1.60);
-                    const visMarks = (this.rigConfig && this.rigConfig.fishingStyle === 'HO_DAU')
-                        ? 2.2
-                        : (this.activeCalibration ? this.activeCalibration.visibleMarks : 3);
-                    const finalDist = visMarks >= 8 ? 2.15 : (visMarks >= 5 ? 1.55 : 1.25);
+                    const isHD = !!(this.rigConfig && this.rigConfig.fishingStyle === 'HO_DAU');
+                    const visMarks = isHD ? 2.2 : (this.activeCalibration ? this.activeCalibration.visibleMarks : 3);
+                    const finalDist = isHD ? 1.06 : (visMarks >= 8 ? 2.15 : (visMarks >= 5 ? 1.55 : 1.25));
                     camDist = THREE.MathUtils.lerp(1.65, finalDist, t);
-                    camHeight = THREE.MathUtils.lerp(0.28, visMarks >= 8 ? 0.34 : 0.20, t);
+                    camHeight = THREE.MathUtils.lerp(0.28, isHD ? 0.16 : (visMarks >= 8 ? 0.34 : 0.20), t);
                     lookY = THREE.MathUtils.lerp(0.04, 0.0, t); // Khớp chuẩn vạch MẶT NƯỚC tại đúng y = 0.00m!
                 }
             } else {
-                const visMarks = (this.rigConfig && this.rigConfig.fishingStyle === 'HO_DAU')
-                    ? 2.2
-                    : (this.activeCalibration ? this.activeCalibration.visibleMarks : 3);
-                camDist = visMarks >= 8 ? 2.15 : (visMarks >= 5 ? 1.55 : 1.25);
-                camHeight = visMarks >= 8 ? 0.34 : 0.20;
+                const isHD = !!(this.rigConfig && this.rigConfig.fishingStyle === 'HO_DAU');
+                const visMarks = isHD ? 2.2 : (this.activeCalibration ? this.activeCalibration.visibleMarks : 3);
+                camDist = isHD ? 1.06 : (visMarks >= 8 ? 2.15 : (visMarks >= 5 ? 1.55 : 1.25));
+                camHeight = isHD ? 0.16 : (visMarks >= 8 ? 0.34 : 0.20);
                 lookY = 0.0; // Khớp chuẩn đường MẶT NƯỚC ở giữa kính ngắm với đúng mặt nước 3D (y = 0)!
             }
 
