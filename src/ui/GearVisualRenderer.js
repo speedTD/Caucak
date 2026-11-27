@@ -396,10 +396,10 @@ export function renderShopItemSVG(item = {}) {
                 <path d="M 22 40 C 17 50, 17 77, 26 80 L 38 80 C 47 77, 47 50, 42 40 Z" fill="#9a3412" opacity="0.9"/>
                 <rect x="22" y="48" width="20" height="20" rx="2" transform="rotate(-2 32 58)" fill="#fef3c7" stroke="#b91c1c" stroke-width="1"/>
                 <text x="32" y="57" text-anchor="middle" fill="#991b1b" font-size="6.0" font-weight="900">THUỐC BẮC</text>
-                <text x="32" y="64" text-anchor="middle" fill="#78350f" font-size="5.3" font-weight="800">5-10 giọt/kg</text>
+                <text x="32" y="64" text-anchor="middle" fill="#78350f" font-size="5.3" font-weight="800">5-10ml/1kg</text>
             </svg>`;
         }
-        // Chai tinh mùi nhỏ giọt chuyên pha Cám (Mật Khoai, Tương Sữa Thơm, Lục Hương, Sữa Ngô)
+        // Chai tinh mùi có vạch chia ml chuyên pha Cám (Mật Khoai, Tương Sữa Thơm, Lục Hương, Sữa Ngô)
         const liquidColors = {
             sweet_corn: '#facc15',
             sweet_potato: '#ea580c',
@@ -413,12 +413,16 @@ export function renderShopItemSVG(item = {}) {
         const liq = liquidColors[item.flavorType] || '#f59e0b';
         return `
         <svg viewBox="0 0 64 88" width="54" height="74" xmlns="http://www.w3.org/2000/svg">
-            <rect x="26" y="6" width="12" height="11" rx="5" fill="#dc2626"/>
+            <rect x="24" y="5" width="16" height="11" rx="3" fill="rgba(226,232,240,0.42)" stroke="#94a3b8" stroke-width="0.9"/>
             <rect x="23" y="16" width="18" height="6" rx="1.5" fill="#facc15"/>
             <path d="M 25 22 L 39 22 L 45 32 L 45 76 C 45 80, 42 82, 38 82 L 26 82 C 22 82, 19 80, 19 76 L 19 32 Z" fill="rgba(226,232,240,0.22)" stroke="#cbd5e1" stroke-width="1.4"/>
-            <path d="M 20.5 40 L 43.5 40 L 43.5 75 C 43.5 78.5, 41 80.5, 38 80.5 L 26 80.5 C 23 80.5, 20.5 78.5, 20.5 75 Z" fill="${liq}" opacity="0.90"/>
+            <path d="M 20.5 38 L 43.5 38 L 43.5 75 C 43.5 78.5, 41 80.5, 38 80.5 L 26 80.5 C 23 80.5, 20.5 78.5, 20.5 75 Z" fill="${liq}" opacity="0.92"/>
+            <!-- Vạch chia ml trên thân chai -->
+            <line x1="40" y1="41" x2="44" y2="41" stroke="#f8fafc" stroke-width="1"/>
+            <line x1="40" y1="50" x2="44" y2="50" stroke="#f8fafc" stroke-width="1"/>
+            <line x1="40" y1="59" x2="44" y2="59" stroke="#f8fafc" stroke-width="1"/>
             <rect x="21" y="47" width="22" height="22" rx="2" fill="#0f172a" stroke="#facc15" stroke-width="0.8"/>
-            <text x="32" y="57" text-anchor="middle" fill="#fde047" font-size="5.8" font-weight="800">PHA CÁM</text>
+            <text x="32" y="57" text-anchor="middle" fill="#fde047" font-size="5.6" font-weight="800">NẮP ĐONG ML</text>
             <text x="32" y="65" text-anchor="middle" fill="#e2e8f0" font-size="5.6">${item.volume || '150ml'}</text>
             <line x1="23" y1="33" x2="23" y2="75" stroke="rgba(255,255,255,0.55)" stroke-width="1.6" stroke-linecap="round"/>
         </svg>`;

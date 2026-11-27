@@ -625,7 +625,7 @@ export class UIManager {
                             <span class="mm-ico">🐚</span>
                             <div class="mm-txt">
                                 <b>Câu Ốc (Ốc Bươu / Ốc Vặn)</b>
-                                <small>Chuẩn: 5–10 giọt Rượu Thuốc Bắc / 1kg cám</small>
+                                <small>Chuẩn: 5ml–10ml Rượu Thuốc Bắc / 1kg cám</small>
                             </div>
                         </button>
                         <button class="mix-mode-tab" data-mode="CORN">
@@ -642,7 +642,7 @@ export class UIManager {
                         <span class="preset-label">⚡ BÀI MẪU CHUẨN TỶ LỆ:</span>
                         <button class="btn-preset-recipe" id="preset-cam-quocdan">🥣 Cám Chép Mật Khoai + Sữa Ngô</button>
                         <button class="btn-preset-recipe" id="preset-cam-daugiai">🌿 Cám Lục Hương + Tương Sữa</button>
-                        <button class="btn-preset-recipe" id="preset-oc-thuocbac">🐚 Ốc Bươu Ủ Cám + 8 Giọt Rượu Thuốc Bắc</button>
+                        <button class="btn-preset-recipe" id="preset-oc-thuocbac">🐚 Ốc Bươu Ủ Cám + 8ml Rượu Thuốc Bắc</button>
                         <button class="btn-preset-recipe" id="preset-ngo-nuocxanh">🌽 10 Bắp Ngô Ngọt + 8ml Nước Xanh</button>
                     </div>
 
@@ -661,7 +661,7 @@ export class UIManager {
                             <div class="section-title" style="margin-top:10px;">1. Bỏ Nguyên Liệu Nền Vào Chậu (Cám 35k/kg • Ngô 10k/bắp • Ốc 20k/kg)</div>
                             <div class="base-select-grid" id="base-bait-list"></div>
 
-                            <div class="section-title" style="margin-top:12px;">2. Nhỏ Hương Liệu Vào Chậu (Đúng Tỷ Lệ Tránh Nặng Mùi Đè Phao)</div>
+                            <div class="section-title" style="margin-top:12px;">2. Đong Các Chai Hương Liệu Vào Chậu (Đơn Vị ml — Đúng Tỷ Lệ Tránh Nặng Mùi Đè Phao)</div>
                             <div class="flavor-controls" id="flavor-select-list"></div>
                         </div>
 
@@ -3735,7 +3735,7 @@ export class UIManager {
         });
     }
 
-    // BƯỚC 2B: KỆ HƯƠNG LIỆU NHỎ VÀO CHẬU (Giọt cho Cám & Rượu Thuốc Bắc • ml cho Nước Xanh)
+    // BƯỚC 2B: KỆ TRƯNG BÀY 6 CHAI HƯƠNG LIỆU TRỰC QUAN + TĂNG/GIẢM SỐ ML ĐONG VÀO CHẬU
     renderMixFlavors() {
         const container = document.getElementById('flavor-select-list');
         if (!container) return;
@@ -3751,54 +3751,86 @@ export class UIManager {
 
         flavorItems.forEach(item => {
             const owned = this.playerInventory[item.id] || 0;
-            const currentAmt = this.mixingSystem.currentMix.flavors[item.id] || 0;
-            const unit = item.doseUnit || 'giọt';
+            const currentAmt = Number(this.mixingSystem.currentMix.flavors[item.id] || 0);
+            const unit = item.doseUnit || 'ml';
             const isMatch = item.bestFor === mode;
 
             const row = document.createElement('div');
             row.className = `flavor-row ${currentAmt > 0 ? 'in-basin' : ''} ${isMatch ? 'flavor-recommended' : ''}`;
             row.innerHTML = `
-                <div class="flavor-name">
-                    <div>${item.icon} <b>${item.name}</b> ${isMatch ? '<span class="flv-rec-badge">⭐ Khuyên dùng</span>' : ''}</div>
-                    <small class="flv-best-note">${item.bestForLabel || item.brand}</small>
+                <div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1;">
+                    <div class="flavor-bottle-thumb" title="${item.description || item.name}">
+                        ${renderShopItemSVG(item)}
+                        ${currentAmt > 0 ? `<span class="flavor-ml-pill">${currentAmt}ml</span>` : ''}
+                    </div>
+                    <div class="flavor-name" style="min-width:0;">
+                        <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">
+                            <b>${item.name}</b>
+                            <span style="font-size:10.5px;color:#94a3b8;">(${item.volume || 'Chai 150ml'})</span>
+                            ${isMatch ? '<span class="flv-rec-badge">⭐ Khuyên dùng</span>' : ''}
+                        </div>
+                        <small class="flv-best-note" style="display:block;margin-top:2px;">${item.bestForLabel || item.brand}</small>
+                        <small style="display:block;font-size:10.5px;color:${owned > 0 ? '#7dd3fc' : '#fca5a5'};margin-top:1px;">
+                            Kho: <b>${owned} chai</b>
+                        </small>
+                    </div>
                 </div>
-                <div class="flavor-drops-control">
+                <div class="flavor-drops-control" style="flex-wrap:wrap;justify-content:flex-end;gap:5px;">
                     ${owned > 0 ? `
-                        <button class="btn-drop minus" ${currentAmt <= 0 ? 'disabled' : ''}>−</button>
-                        <span class="drop-num"><b>${currentAmt}</b> ${unit}</span>
-                        <button class="btn-drop plus">+1</button>
-                        <button class="btn-drop plus5" title="Thêm nhanh 5 ${unit}">+5</button>
+                        <button class="btn-ml-step btn-ml-minus" ${currentAmt <= 0 ? 'disabled' : ''} title="Giảm 1ml">−1ml</button>
+                        <div style="display:flex;align-items:center;gap:3px;">
+                            <input type="number" class="flavor-ml-input" min="0" max="50" step="0.5" value="${currentAmt}" title="Nhập trực tiếp số ml đong vào chậu" />
+                            <span style="font-size:11.5px;font-weight:800;color:#fde047;">${unit}</span>
+                        </div>
+                        <button class="btn-ml-step btn-ml-plus1" title="Đong thêm +1ml">+1ml</button>
+                        <button class="btn-ml-step btn-ml-fast btn-ml-plus2" title="Đong thêm +2ml">+2ml</button>
+                        <button class="btn-ml-step btn-ml-fast btn-ml-plus5" title="Đong nhanh +5ml">+5ml</button>
                     ` : `
                         <button class="btn-quick-buy-base btn-buy-flavor">🛒 Mua Chai (${Math.round(item.price / 1000)}k)</button>
                     `}
                 </div>
             `;
 
-            const minusBtn = row.querySelector('.minus');
+            const applyNewMl = (val) => {
+                const clamped = Math.max(0, Math.min(50, Math.round((Number(val) || 0) * 2) / 2));
+                this.mixingSystem.setFlavorDrops(item.id, clamped);
+                this.renderMixFlavors();
+                this.updateMixAnalysis();
+            };
+
+            const minusBtn = row.querySelector('.btn-ml-minus');
             if (minusBtn) {
                 minusBtn.onclick = () => {
                     soundManager.playClick();
-                    this.mixingSystem.setFlavorDrops(item.id, Math.max(0, currentAmt - 1));
-                    this.renderMixFlavors();
-                    this.updateMixAnalysis();
+                    applyNewMl(currentAmt - 1);
                 };
             }
-            const plusBtn = row.querySelector('.plus');
-            if (plusBtn) {
-                plusBtn.onclick = () => {
+            const plus1Btn = row.querySelector('.btn-ml-plus1');
+            if (plus1Btn) {
+                plus1Btn.onclick = () => {
                     soundManager.playClick();
-                    this.mixingSystem.setFlavorDrops(item.id, currentAmt + 1);
-                    this.renderMixFlavors();
-                    this.updateMixAnalysis();
+                    applyNewMl(currentAmt + 1);
                 };
             }
-            const plus5Btn = row.querySelector('.plus5');
+            const plus2Btn = row.querySelector('.btn-ml-plus2');
+            if (plus2Btn) {
+                plus2Btn.onclick = () => {
+                    soundManager.playClick();
+                    applyNewMl(currentAmt + 2);
+                };
+            }
+            const plus5Btn = row.querySelector('.btn-ml-plus5');
             if (plus5Btn) {
                 plus5Btn.onclick = () => {
                     soundManager.playClick();
-                    this.mixingSystem.setFlavorDrops(item.id, currentAmt + 5);
-                    this.renderMixFlavors();
-                    this.updateMixAnalysis();
+                    applyNewMl(currentAmt + 5);
+                };
+            }
+            const mlInput = row.querySelector('.flavor-ml-input');
+            if (mlInput) {
+                mlInput.onchange = () => {
+                    soundManager.playClick();
+                    applyNewMl(mlInput.value);
                 };
             }
             const buyFlvBtn = row.querySelector('.btn-buy-flavor');
@@ -3815,7 +3847,7 @@ export class UIManager {
                     this.mixingSystem.setFlavorDrops(item.id, item.suggestedDrops || 5);
                     this.renderMixFlavors();
                     this.updateMixAnalysis();
-                    this.showPrompt(`🛒 Đã mua chai [${item.name}] và nhỏ sẵn ${item.suggestedDrops || 5} ${unit} vào chậu!`);
+                    this.showPrompt(`🛒 Đã mua chai [${item.name}] và đong sẵn ${item.suggestedDrops || 5}ml vào chậu!`);
                 };
             }
 
@@ -4422,6 +4454,12 @@ export class UIManager {
             Object.entries(def).forEach(([k, v]) => {
                 merged[k] = v;
             });
+        }
+        // Đảm bảo nếu hồ sơ cũ chưa từng có 6 chai hương liệu mới thì cấp đủ 6 chai khởi đầu để đong ml ngay!
+        const flavorKeys = ['hl_mat_khoai', 'hl_tuong_sua_thom', 'hl_luc_huong', 'hl_sua_ngo', 'hl_ruou_thuoc_bac', 'hl_nuoc_xanh'];
+        const hasAnyNewFlavor = flavorKeys.some(fk => typeof merged[fk] === 'number');
+        if (!hasAnyNewFlavor) {
+            flavorKeys.forEach(fk => { merged[fk] = 1; });
         }
         return merged;
     }

@@ -6,21 +6,21 @@ export const FISHING_MODES = {
         id: 'CAM',
         icon: '🥣',
         label: 'Câu Cám',
-        shortTitle: 'Phối Cám Nền + Hương Liệu Cám',
-        ruleHint: 'Dùng Cám Nền (Thơm / Tanh / Thơm Tanh) phối Mật Khoai, Tương Sữa Thơm, Lục Hương, Sữa Ngô (4–8 giọt / 1kg cám).'
+        shortTitle: 'Phối Cám Nền + Hương Liệu Cám (ml)',
+        ruleHint: 'Dùng Cám Nền (Thơm / Tanh / Thơm Tanh) phối Mật Khoai, Tương Sữa Thơm, Lục Hương, Sữa Ngô (tổng 4ml–8ml / 1kg cám).'
     },
     SNAIL: {
         id: 'SNAIL',
         icon: '🐚',
         label: 'Câu Ốc',
-        shortTitle: 'Ủ Ốc Bươu / Ốc Vặn + Cám + Rượu Thuốc Bắc',
-        ruleHint: 'Tỷ lệ hợp lý: 5–10 giọt Rượu Thuốc Bắc / 1kg cám ủ ốc. Pha > 10 giọt/1kg sẽ làm nặng mùi, cá cày nhiều tăm và chỉ đè phao!'
+        shortTitle: 'Ủ Ốc Bươu / Ốc Vặn + Cám + Rượu Thuốc Bắc (ml)',
+        ruleHint: 'Tỷ lệ hợp lý: 5ml–10ml Rượu Thuốc Bắc / 1kg cám ủ ốc. Pha > 10ml/1kg sẽ làm nặng mùi, cá cày nhiều tăm và chỉ đè phao!'
     },
     CORN: {
         id: 'CORN',
         icon: '🌽',
         label: 'Câu Ngô',
-        shortTitle: 'Ủ Ngô Ngọt + Nước Xanh chuyên dụng',
+        shortTitle: 'Ủ Ngô Ngọt + Nước Xanh chuyên dụng (ml)',
         ruleHint: 'Tỷ lệ hợp lý: 10 bắp Ngô Ngọt pha 5ml–10ml Nước Xanh (0.5–1ml/bắp). Pha nhiều hơn sẽ làm nặng mùi, cá cày chỉ đè phao!'
     }
 };
@@ -349,27 +349,27 @@ export class BaitMixingSystem {
         let scentRadius = 12 + Math.min(8, weightSum * 2.2);
 
         const detectedCombos = [];
-        const flavorTags = flavorEntries.map(({ item, amt }) => `${item.name} (${amt}${item.doseUnit === 'ml' ? 'ml' : ' giọt'})`);
+        const flavorTags = flavorEntries.map(({ item, amt }) => `${item.name} (${amt}ml)`);
         const ingredientSummary = basinEntries.map(({ item, qty }) => `${qty}${item.unitLabel || 'kg'} ${item.name}`).join(' + ');
 
-        // Đánh giá TỶ LỆ VÀNG & QUÁ LIỀU NẶNG MÙI riêng cho từng chế độ câu
+        // Đánh giá TỶ LỆ VÀNG & QUÁ LIỀU NẶNG MÙI riêng cho từng chế độ câu (tất cả hương liệu đong theo ml!)
         let isFlavorOverdose = false;
         let normalizedFlavorDose = 5;
         let ratioVerdict = 'NORMAL';
         let ratioBadge = '';
         let ratioExplain = '';
-        let flavorSummary = 'Mộc tự nhiên';
+        let flavorSummary = 'Mộc tự nhiên (0ml)';
 
         if (mode === 'SNAIL') {
-            // QUY TẮC Ủ ỐC: Rượu Thuốc Bắc 5–10 giọt / 1kg cám hợp lý; > 10 giọt / 1kg -> nặng mùi cá cày chỉ đè phao!
+            // QUY TẮC Ủ ỐC: Rượu Thuốc Bắc 5ml–10ml / 1kg cám hợp lý; > 10ml / 1kg -> nặng mùi cá cày chỉ đè phao!
             const refKg = camKg > 0 ? camKg : snailKg;
             const ruouPerKg = ruouDrops / Math.max(0.25, refKg);
             const extraPerKg = (camFlavorDrops + nuocXanhMl * 1.5) / Math.max(0.25, refKg);
             const totalPerKg = ruouPerKg + extraPerKg;
             normalizedFlavorDose = Number(totalPerKg.toFixed(1));
             flavorSummary = ruouDrops > 0
-                ? `${ruouDrops} giọt Rượu Thuốc Bắc / ${refKg}kg ${camKg > 0 ? 'cám' : 'ốc'} (${ruouPerKg.toFixed(1)} giọt/kg)`
-                : (totalFlavorRaw > 0 ? `${totalFlavorRaw} giọt tinh mùi phụ` : 'Ốc mộc chưa ủ');
+                ? `${ruouDrops}ml Rượu Thuốc Bắc / ${refKg}kg ${camKg > 0 ? 'cám' : 'ốc'} (${ruouPerKg.toFixed(1)}ml/kg)`
+                : (totalFlavorRaw > 0 ? `${totalFlavorRaw}ml tinh mùi phụ` : 'Ốc mộc chưa ủ (0ml)');
 
             if (camKg > 0 && snailKg > 0) {
                 detectedCombos.push(`🐚 Nền Ủ Ốc Chuẩn Đài: ${snailKg}kg Ốc tươi + ${camKg}kg Cám Nền giữ ổ bền bỉ`);
@@ -384,17 +384,17 @@ export class BaitMixingSystem {
             if (ruouPerKg > 10 || totalPerKg > 10.5) {
                 isFlavorOverdose = true;
                 ratioVerdict = 'OVERDOSE';
-                ratioBadge = `🚨 QUÁ LIỀU (${ruouPerKg.toFixed(1)} giọt/1kg > 10 giọt/1kg) ➔ NẶNG MÙI ĐÈ PHAO!`;
-                ratioExplain = `⚠️ Bạn đang pha ${ruouDrops} giọt Rượu Thuốc Bắc cho ${refKg}kg ${camKg > 0 ? 'cám' : 'ốc'} (${ruouPerKg.toFixed(1)} giọt/1kg — vượt mức 5–10 giọt/1kg)! Mùi thuốc bắc quá nồng làm cá chỉ cày nhiều tăm và đè phao chứ không ăn!`;
+                ratioBadge = `🚨 QUÁ LIỀU (${ruouPerKg.toFixed(1)}ml/1kg > 10ml/1kg) ➔ NẶNG MÙI ĐÈ PHAO!`;
+                ratioExplain = `⚠️ Bạn đang đong ${ruouDrops}ml Rượu Thuốc Bắc cho ${refKg}kg ${camKg > 0 ? 'cám' : 'ốc'} (${ruouPerKg.toFixed(1)}ml/1kg — vượt mức 5–10ml/1kg)! Mùi thuốc bắc quá nồng làm cá chỉ cày nhiều tăm và đè phao chứ không ăn!`;
             } else if (ruouPerKg >= 5 && ruouPerKg <= 10) {
                 isFlavorOverdose = false;
                 ratioVerdict = 'OPTIMAL';
                 const recLabel = Number.isInteger(ruouPerKg) ? ruouPerKg : ruouPerKg.toFixed(1);
-                ratioBadge = `✅ TỶ LỆ VÀNG Ủ ỐC (${recLabel} giọt Rượu Thuốc Bắc / 1kg ${camKg > 0 ? 'cám' : 'ốc'})`;
+                ratioBadge = `✅ TỶ LỆ VÀNG Ủ ỐC (${recLabel}ml Rượu Thuốc Bắc / 1kg ${camKg > 0 ? 'cám' : 'ốc'})`;
                 ratioExplain = camKg > 0
-                    ? `🔥 Đạt chuẩn 5–10 giọt Rượu Thuốc Bắc / 1kg cám! Ốc dậy hương thảo mộc đầm sâu, Trắm Đen & Chép Cụ vào ổ hút phao lút hình!`
-                    : `👍 Đúng tỷ lệ 5–10 giọt/kg! Mẹo: Bỏ thêm 1kg Cám Nền vào chậu trộn cùng ốc sẽ thành bài Cám Ủ Ốc đỉnh cao!`;
-                detectedCombos.push('🍶🔥 Bí Kíp Ốc Ủ Rượu Thuốc Bắc (5–10 giọt/1kg): Sát Thủ Trắm Đen & Chép Cụ!');
+                    ? `🔥 Đạt chuẩn 5ml–10ml Rượu Thuốc Bắc / 1kg cám! Ốc dậy hương thảo mộc đầm sâu, Trắm Đen & Chép Cụ vào ổ bấm phao dứt khoát!`
+                    : `👍 Đúng tỷ lệ 5ml–10ml/kg! Mẹo: Bỏ thêm 1kg Cám Nền vào chậu trộn cùng ốc sẽ thành bài Cám Ủ Ốc đỉnh cao!`;
+                detectedCombos.push('🍶🔥 Bí Kíp Ốc Ủ Rượu Thuốc Bắc (5–10ml/1kg): Sát Thủ Trắm Đen & Chép Cụ!');
                 totalScore += 16;
                 bigCarpScore += 24;
                 scentRadius += 8;
@@ -403,8 +403,8 @@ export class BaitMixingSystem {
                 ratioVerdict = 'LIGHT';
                 const minD = Math.ceil(5 * refKg);
                 const maxD = Math.floor(10 * refKg);
-                ratioBadge = `💡 HƠI NHẠT RƯỢU THUỐC BẮC (${ruouPerKg.toFixed(1)} giọt / 1kg)`;
-                ratioExplain = `Với ${refKg}kg ${camKg > 0 ? 'cám' : 'ốc'} trong chậu, nên nhỏ từ ${minD}–${maxD} giọt Rượu Thuốc Bắc (tỷ lệ 5–10 giọt/1kg cám) để đạt độ bén tối đa.`;
+                ratioBadge = `💡 HƠI NHẠT RƯỢU THUỐC BẮC (${ruouPerKg.toFixed(1)}ml / 1kg)`;
+                ratioExplain = `Với ${refKg}kg ${camKg > 0 ? 'cám' : 'ốc'} trong chậu, nên đong từ ${minD}ml–${maxD}ml Rượu Thuốc Bắc (tỷ lệ 5–10ml/1kg cám) để đạt độ bén tối đa.`;
                 totalScore += 4;
                 bigCarpScore += 6;
             } else {
@@ -412,8 +412,8 @@ export class BaitMixingSystem {
                 ratioVerdict = 'PLAIN';
                 const minD = Math.ceil(5 * refKg);
                 const maxD = Math.floor(10 * refKg);
-                ratioBadge = '🐚 ỐC TƯƠI MỘC (Chưa có Rượu Thuốc Bắc)';
-                ratioExplain = `Gợi ý: Nhỏ thêm ${minD}–${maxD} giọt Rượu Thuốc Bắc (chuẩn 5–10 giọt / 1kg cám) để kích thích cá lớn mở miệng nhanh hơn!`;
+                ratioBadge = '🐚 ỐC TƯƠI MỘC (Chưa đong Rượu Thuốc Bắc)';
+                ratioExplain = `Gợi ý: Đong thêm ${minD}ml–${maxD}ml Rượu Thuốc Bắc (chuẩn 5–10ml / 1kg cám) để kích thích cá lớn mở miệng nhanh hơn!`;
             }
         } else if (mode === 'CORN') {
             // QUY TẮC Ủ NGÔ: 10 bắp Ngô Ngọt pha 5ml–10ml Nước Xanh hợp lý; > 10ml/10 bắp -> nặng mùi cá cày chỉ đè phao!
@@ -456,15 +456,15 @@ export class BaitMixingSystem {
                 ratioExplain = `Gợi ý: Đong ${minMl}ml – ${maxMl}ml Nước Xanh cho ${cornCobs} bắp ngô trong chậu (tỷ lệ vàng 5–10ml / 10 bắp)!`;
             }
         } else {
-            // QUY TẮC CÂU CÁM: Dùng Mật Khoai, Tương Sữa Thơm, Lục Hương, Sữa Ngô (4–9 giọt / 1kg cám)
+            // QUY TẮC CÂU CÁM: Dùng Mật Khoai, Tương Sữa Thơm, Lục Hương, Sữa Ngô (4ml–9ml / 1kg cám)
             const camDropsPerKg = camFlavorDrops / Math.max(0.25, camKg);
             const offModePerKg = (ruouDrops * 1.25 + nuocXanhMl * 1.35) / Math.max(0.25, camKg);
             const totalPerKg = camDropsPerKg + offModePerKg;
             normalizedFlavorDose = Number(totalPerKg.toFixed(1));
             const safeMax = currentWeather === 'RAINY' ? 10 : 9;
             flavorSummary = totalFlavorRaw > 0
-                ? `${camFlavorDrops} giọt hương cám / ${camKg}kg cám (${totalPerKg.toFixed(1)} giọt/kg)`
-                : 'Cám nền mộc';
+                ? `${camFlavorDrops}ml hương cám / ${camKg}kg cám (${totalPerKg.toFixed(1)}ml/kg)`
+                : 'Cám nền mộc (0ml)';
 
             // Phát hiện combo phối hương cám thực tế
             const activeCamFlavors = camFlavorIds.filter(id => (flavors[id] || 0) > 0);
@@ -488,12 +488,12 @@ export class BaitMixingSystem {
             if (totalPerKg > safeMax) {
                 isFlavorOverdose = true;
                 ratioVerdict = 'OVERDOSE';
-                ratioBadge = `🚨 NẶNG HƯƠNG LIỆU CÁM (${totalPerKg.toFixed(1)} giọt/1kg) ➔ CÁ CÀY ĐÈ PHAO!`;
-                ratioExplain = `⚠️ Đang pha vượt ngưỡng ${safeMax} giọt / 1kg cám! Tinh mùi quá gắt làm cá sặc mùi cày nhiều tăm quanh phao và chỉ quẹt dây đè phao chìm dần rồi nổi lên!`;
+                ratioBadge = `🚨 NẶNG HƯƠNG LIỆU CÁM (${totalPerKg.toFixed(1)}ml/1kg) ➔ CÁ CÀY ĐÈ PHAO!`;
+                ratioExplain = `⚠️ Đang đong vượt ngưỡng ${safeMax}ml / 1kg cám! Tinh mùi quá gắt làm cá sặc mùi cày nhiều tăm quanh phao và chỉ quẹt dây đè phao chìm dần rồi nổi lên!`;
             } else if (camDropsPerKg >= 4 && camDropsPerKg <= safeMax && offModePerKg <= 2) {
                 isFlavorOverdose = false;
                 ratioVerdict = 'OPTIMAL';
-                ratioBadge = `✅ TỶ LỆ CÁM HỢP LÝ (${camDropsPerKg.toFixed(1).replace('.0', '')} giọt / 1kg cám • ${activeCamFlavors.length} vị)`;
+                ratioBadge = `✅ TỶ LỆ CÁM HỢP LÝ (${camDropsPerKg.toFixed(1).replace('.0', '')}ml / 1kg cám • ${activeCamFlavors.length} vị)`;
                 ratioExplain = `🔥 Hương liệu chuyên Cám hòa quyện vừa vặn với ${camKg}kg cám nền, mồi bung tơi dẫn dụ cá ăn dứt khoát!`;
                 totalScore += 10;
                 bigCarpScore += 8;
@@ -508,8 +508,8 @@ export class BaitMixingSystem {
                 ratioVerdict = 'LIGHT';
                 const minD = Math.ceil(4 * camKg);
                 const maxD = Math.floor(8 * camKg);
-                ratioBadge = camFlavorDrops === 0 ? '🥣 CÁM NỀN MỘC CHƯA PHA HƯƠNG LIỆU' : `💡 HƯƠNG DỊU NHẸ (${camDropsPerKg.toFixed(1)} giọt / 1kg cám)`;
-                ratioExplain = `Gợi ý: Với ${camKg}kg Cám Nền trong chậu, nhỏ tổng cộng ${minD}–${maxD} giọt (Mật Khoai / Tương Sữa Thơm / Lục Hương / Sữa Ngô) là hợp lý nhất!`;
+                ratioBadge = camFlavorDrops === 0 ? '🥣 CÁM NỀN MỘC CHƯA PHA HƯƠNG LIỆU' : `💡 HƯƠNG DỊU NHẸ (${camDropsPerKg.toFixed(1)}ml / 1kg cám)`;
+                ratioExplain = `Gợi ý: Với ${camKg}kg Cám Nền trong chậu, đong tổng cộng ${minD}ml–${maxD}ml (Mật Khoai / Tương Sữa Thơm / Lục Hương / Sữa Ngô) là hợp lý nhất!`;
             }
         }
 
