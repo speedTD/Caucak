@@ -287,9 +287,10 @@ export class UIManager {
                 <span class="camp-ico">🏕️</span>
                 <div class="camp-body">
                     <div class="camp-title">LÁN TRẠI TẬP TRUNG • NGHỈ ĐÊM CHỜ SÁNG</div>
-                    <div class="camp-sub">Tự do đi lại, trò chuyện, đi Chợ Thế Giới! Tự động truyền tống về cổng hồ lúc 06:00 sáng.</div>
+                    <div class="camp-sub">Tự do đi dạo Lán Trại, ghé <b>Tiệm Đồ Câu</b> kế bên mua Phao Hố Đấu / Mồi, hoặc đi Chợ Thế Giới!</div>
                 </div>
                 <div class="camp-timer" id="camp-banner-timer">05:00</div>
+                <button class="btn-camp-market" id="btn-camp-open-shop" style="background:linear-gradient(135deg,#f59e0b,#b45309);color:#111827;">🏪 Tiệm Đồ Câu</button>
                 <button class="btn-camp-market" id="btn-camp-open-market">🌐 Chợ Thế Giới</button>
                 <button class="btn-camp-skip" id="btn-camp-skip-night" title="Tua nhanh qua đêm đến 06:00 sáng">⏩ Sáng Ngay</button>
             </div>
@@ -407,6 +408,13 @@ export class UIManager {
                 <div class="spot-near-title" id="spot-near-title">Bến Cầu Gỗ Chính #1</div>
                 <div class="spot-near-desc" id="spot-near-desc">View đồi cây tự nhiên, luồng tăm cá củ thường tụ</div>
                 <button class="btn-sit-near" id="btn-sit-near-act">🪑 HẠ THÙNG NGỒI CÂU NGAY (PHÍM E)</button>
+            </div>
+
+            <!-- Gợi ý vào Cửa Hàng Đồ Câu khi đứng gần Quầy Tiệm Đồ bên cạnh Lán Trại -->
+            <div class="spot-near-banner" id="shop-near-banner" style="display: none; border-color: #f59e0b; box-shadow: 0 10px 28px rgba(245, 158, 11, 0.28);">
+                <div class="spot-near-title" style="color: #fde047;">🏪 TIỆM ĐỒ CÂU ĐÀI & MỒI HƯƠNG (CẠNH LÁN TRẠI)</div>
+                <div class="spot-near-desc">Chuyên Phao Hố Đấu, Cần Đài Carbon, Cám Nền, Ốc Bươu, Ngô Ngọt & Tinh Mùi</div>
+                <button class="btn-sit-near" id="btn-shop-near-act" style="background: linear-gradient(135deg, #f59e0b, #d97706); color: #111827;">🛒 BẤM [PHÍM E / CLICK] VÀO MUA ĐỒ NGAY</button>
             </div>
 
             <!-- THANH THAO TÁC CÂU ĐÀI KHI ĐÃ NGỒI VÀO BẾN -->
@@ -717,7 +725,10 @@ export class UIManager {
             <div class="modal-overlay" id="modal-shop" style="display: none;">
                 <div class="modal-content shop-modal-content">
                     <div class="modal-header">
-                        <h2>🏪 TIỆM MỒI CÂU • HƯƠNG LIỆU & ĐỒ ĐÀI</h2>
+                        <div class="modal-header-text">
+                            <h2>🏪 TIỆM ĐỒ CÂU ĐÀI & MỒI HƯƠNG (BÊN LÁN TRẠI)</h2>
+                            <p class="modal-subtitle">Cửa hàng dựng ngay sát khu Lán Trại ngoài cổng hồ — Mua Phao Hố Đấu, Cần Đài, Cám, Ốc, Ngô & Hương Liệu</p>
+                        </div>
                         <button class="btn-close" id="btn-close-shop">&times;</button>
                     </div>
                     <div class="shop-tabs">
@@ -1447,6 +1458,10 @@ export class UIManager {
         const btnQuickSell = document.getElementById('btn-wm-quick-sell');
         if (btnQuickSell) btnQuickSell.onclick = () => this.quickSellToWorldMarket();
 
+        const btnCampShop = document.getElementById('btn-camp-open-shop');
+        if (btnCampShop) btnCampShop.onclick = () => this.openShopModal();
+        const btnShopNearAct = document.getElementById('btn-shop-near-act');
+        if (btnShopNearAct) btnShopNearAct.onclick = () => this.openShopModal();
         const btnCampMarket = document.getElementById('btn-camp-open-market');
         if (btnCampMarket) btnCampMarket.onclick = () => this.openWorldMarketModal('gear');
         const btnCampSkip = document.getElementById('btn-camp-skip-night');
@@ -2341,8 +2356,34 @@ export class UIManager {
     }
 
     openShopModal(initialTab = 'all') {
+        if (this.gameplay && this.gameplay.state === 'FIGHTING') {
+            this.showPrompt('⚠️ Đang bo cá căng thẳng, không thể rời bến ra Tiệm Đồ bên Lán Trại!');
+            return;
+        }
         document.exitPointerLock();
         soundManager.playClick();
+
+        // Nếu người chơi đang ở trong hồ / ngồi bến xa Lán Trại -> đưa nhân vật đi ra đứng trước Quầy Tiệm Đồ Câu bên cạnh Lán Trại!
+        if (this.player && typeof this.player.isNearTackleShop === 'function') {
+            const shopCheck = this.player.isNearTackleShop(7.0);
+            if (!shopCheck.near) {
+                if (this.gameplay) {
+                    if (
+                        this.gameplay.state === 'CASTING' ||
+                        this.gameplay.state === 'FLOAT_WAIT' ||
+                        this.gameplay.state === 'BITING'
+                    ) {
+                        this.gameplay.retrieveRod();
+                    }
+                    if (this.gameplay.state !== 'ROAM') {
+                        this.gameplay.standUp();
+                    }
+                }
+                this.player.moveToTackleShop();
+                this.showPrompt('🏪 Đã đi ra Cửa Hàng Đồ Câu Đài (dựng ngay bên cạnh khu Lán Trại)!');
+            }
+        }
+
         document.getElementById('modal-shop').style.display = 'flex';
         this.renderShopTabs();
         const targetTab = initialTab || 'all';
@@ -5404,11 +5445,20 @@ export class UIManager {
             }
         }
 
-        // 1. Gợi ý bến câu gần nhất
+        // 1. Gợi ý bến câu gần nhất & Gợi ý vào Cửa Hàng Đồ Câu bên cạnh Lán Trại
         const spotNearBanner = document.getElementById('spot-near-banner');
+        const shopNearBanner = document.getElementById('shop-near-banner');
         if (this.gameplay.state === 'ROAM') {
+            const shopNearInfo = this.player.isNearTackleShop ? this.player.isNearTackleShop() : { near: false };
+            const shopModalEl = document.getElementById('modal-shop');
+            const isShopModalOpen = !!(shopModalEl && shopModalEl.style.display === 'flex');
+
+            if (shopNearBanner) {
+                shopNearBanner.style.display = (shopNearInfo.near && !isShopModalOpen) ? 'flex' : 'none';
+            }
+
             const nearestInfo = this.player.getNearestFishingSpot();
-            if (nearestInfo && nearestInfo.canSit) {
+            if (!shopNearInfo.near && nearestInfo && nearestInfo.canSit) {
                 spotNearBanner.style.display = 'flex';
                 document.getElementById('spot-near-title').innerText = `📍 ${nearestInfo.spot.name}`;
                 document.getElementById('spot-near-desc').innerText = nearestInfo.spot.desc;
@@ -5417,6 +5467,7 @@ export class UIManager {
             }
         } else {
             spotNearBanner.style.display = 'none';
+            if (shopNearBanner) shopNearBanner.style.display = 'none';
         }
 
         // Chế độ Màn Hình Sạch Khi Bo Cá: Ẩn toàn bộ bảng nút ngồi bến, top bar, radar, prompt để nhìn cá chạy & dùng Nút Tròn gần giữa màn hình!

@@ -108,6 +108,11 @@ class GameApp {
 
             if (e.code === 'KeyE') {
                 if (this.gameplay.state === FISHING_STATES.ROAM) {
+                    const nearShop = this.player.isNearTackleShop ? this.player.isNearTackleShop() : { near: false };
+                    if (nearShop.near) {
+                        this.ui.openShopModal();
+                        return;
+                    }
                     if (this.environment && !this.environment.isGateOpen) {
                         this.ui.openLakeGateAndStartRush();
                         return;

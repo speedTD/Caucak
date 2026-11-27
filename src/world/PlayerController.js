@@ -328,11 +328,11 @@ export class PlayerController {
             this.position.addScaledVector(moveDir, currentSpeed * delta);
         }
 
-        // Nếu Chủ Hồ chưa mở cổng (isGateOpen === false), giữ người chơi đứng khu vực ngoài cổng chờ mở cửa
+        // Nếu Chủ Hồ chưa mở cổng (isGateOpen === false), cho phép đi tự do quanh ngoài Cổng Hồ • Khu Lán Trại • Cửa Hàng Đồ Câu!
         if (this.environment && !this.environment.isGateOpen) {
             const gateZ = this.environment.gatePosition ? this.environment.gatePosition.z : 59.8;
-            this.position.z = Math.max(gateZ + 0.7, this.position.z);
-            this.position.x = THREE.MathUtils.clamp(this.position.x, -16.0, 2.0);
+            this.position.z = THREE.MathUtils.clamp(this.position.z, gateZ + 0.7, gateZ + 22.0);
+            this.position.x = THREE.MathUtils.clamp(this.position.x, -32.0, 6.0);
             this.position.y = 1.7;
             this.camera.position.copy(this.position);
             return;
@@ -354,11 +354,39 @@ export class PlayerController {
             }
         }
 
-        // Giới hạn biên ngoài đường dạo quanh hồ chữ nhật
-        this.position.x = THREE.MathUtils.clamp(this.position.x, -(hw + 21.0), (hw + 21.0));
-        this.position.z = THREE.MathUtils.clamp(this.position.z, -(hd + 21.0), (hd + 21.0));
+        // Giới hạn biên ngoài đường dạo quanh hồ chữ nhật & mở rộng phía Nam sang Khu Lán Trại + Cửa Hàng Đồ Câu
+        this.position.x = THREE.MathUtils.clamp(this.position.x, -(hw + 24.0), (hw + 24.0));
+        this.position.z = THREE.MathUtils.clamp(this.position.z, -(hd + 21.0), (hd + 26.0));
 
         this.position.y = 1.7;
+        this.camera.position.copy(this.position);
+    }
+
+    // Kiểm tra người chơi có đang đứng gần Quầy Cửa Hàng Đồ Câu bên cạnh Lán Trại hay không
+    isNearTackleShop(maxDist = 5.8) {
+        if (!this.environment || !this.environment.tackleShopPos) {
+            return { near: false, dist: Infinity };
+        }
+        const sp = this.environment.tackleShopPos;
+        const dist = Math.hypot(this.position.x - sp.x, this.position.z - sp.z);
+        return { near: dist <= maxDist, dist };
+    }
+
+    // Đưa người chơi ra đứng ngay trước Quầy Cửa Hàng Đồ Câu bên Lán Trại và hướng mắt nhìn thẳng vào tiệm
+    moveToTackleShop() {
+        if (!this.environment || !this.environment.tackleShopStandPos) return;
+        this.isSeated = false;
+        this.rushAnim = null;
+        this.position.copy(this.environment.tackleShopStandPos);
+        this.position.y = 1.7;
+        if (this.environment.tackleShopLookTarget) {
+            const dx = this.environment.tackleShopLookTarget.x - this.position.x;
+            const dz = this.environment.tackleShopLookTarget.z - this.position.z;
+            this.yaw = Math.atan2(-dx, -dz);
+            this.pitch = 0.02;
+        }
+        const euler = new THREE.Euler(this.pitch, this.yaw, 0, 'YXZ');
+        this.camera.quaternion.setFromEuler(euler);
         this.camera.position.copy(this.position);
     }
 

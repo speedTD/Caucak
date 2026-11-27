@@ -40,9 +40,13 @@ export class Environment {
         this.staffOnArrived = null;
         this.staffWaitAtSpotTimer = 0;
 
-        // CỔNG HỒ CÂU ĐÀI (Bờ Nam tại Z = 26.8m) & KHU LÁN TRẠI TẬP TRUNG NGHỈ ĐÊM
+        // CỔNG HỒ CÂU ĐÀI (Bờ Nam tại Z = 26.8m) • KHU LÁN TRẠI TẬP TRUNG & CỬA HÀNG ĐỒ CÂU ĐÀI 3D
         this.gatePosition = new THREE.Vector3(-8.0, 0.42, 26.8);
         this.campPosition = new THREE.Vector3(-18.0, 1.7, 36.0);
+        this.tackleShopPos = new THREE.Vector3(-8.9, 0.0, 38.0);
+        this.tackleShopStandPos = new THREE.Vector3(-10.0, 1.7, 39.8);
+        this.tackleShopLookTarget = new THREE.Vector3(-8.2, 1.85, 36.7);
+        this.tackleShopKeeper = null;
         this.campFireLight = null;
         this.campFireFlame = null;
         this.isGateOpen = true;
@@ -545,12 +549,19 @@ export class Environment {
         const campGroup = new THREE.Group();
         campGroup.position.set(cx, 0, cz);
 
-        // Nền sân lán trại rộng 16m x 12m
-        const padMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.9 });
-        const pad = new THREE.Mesh(new THREE.BoxGeometry(16, 0.16, 12), padMat);
-        pad.position.set(0, 0.08, 0);
+        // Nền sân lát đá chung rộng rãi nối liền Khu Lán Trại với Cửa Hàng Đồ Câu Đài & lối ra Cổng Hồ
+        const padMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.88 });
+        const pad = new THREE.Mesh(new THREE.BoxGeometry(28.0, 0.16, 13.5), padMat);
+        pad.position.set(4.5, 0.08, 0.4);
         pad.receiveShadow = true;
         campGroup.add(pad);
+
+        // Đường đá lát dẫn thẳng từ Cổng Hồ vào Sân Lán Trại & Cửa Hàng Đồ Câu
+        const walkwayMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.85 });
+        const gateWalkway = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.14, 9.5), walkwayMat);
+        gateWalkway.position.set(9.8, 0.07, -7.2);
+        gateWalkway.receiveShadow = true;
+        campGroup.add(gateWalkway);
 
         // Nhà Lán mái xanh rộng che mưa nắng phía sau đống lửa
         const postMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.85 });
@@ -623,6 +634,249 @@ export class Environment {
             bulb.position.set(bx, 3.05, -0.75);
             campGroup.add(bulb);
         }
+
+        // ==================== CỬA HÀNG ĐỒ CÂU ĐÀI & MỒI HƯƠNG 3D DỰNG NGAY BÊN CẠNH LÁN TRẠI ====================
+        const shopLocalX = 9.8;
+        const shopLocalZ = 0.2;
+        const shopYaw = -0.48; // Quay mặt tiền hướng chéo vào sân lửa trại & lối đi Cổng Hồ
+        const shopGroup = new THREE.Group();
+        shopGroup.position.set(shopLocalX, 0.16, shopLocalZ);
+        shopGroup.rotation.y = shopYaw;
+
+        const sinY = Math.sin(shopYaw);
+        const cosY = Math.cos(shopYaw);
+        this.tackleShopPos.set(cx + shopLocalX + sinY * 1.5, 0.2, cz + shopLocalZ + cosY * 1.5);
+        this.tackleShopStandPos.set(cx + shopLocalX + sinY * 3.7, 1.7, cz + shopLocalZ + cosY * 3.7);
+        this.tackleShopLookTarget.set(cx + shopLocalX, 1.82, cz + shopLocalZ);
+
+        // 1. Sàn gỗ hiên tiệm + Tường hậu & 2 vách bên ấm cúng
+        const woodDeckMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.78 });
+        const wallCreamMat = new THREE.MeshStandardMaterial({ color: 0xfef3c7, roughness: 0.82 });
+        const darkFrameMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.55, roughness: 0.35 });
+        const shopRoofMat = new THREE.MeshStandardMaterial({ color: 0x991b1b, metalness: 0.25, roughness: 0.52 });
+
+        const shopDeck = new THREE.Mesh(new THREE.BoxGeometry(6.8, 0.16, 4.6), woodDeckMat);
+        shopDeck.position.set(0, 0.08, 0);
+        shopDeck.receiveShadow = true;
+        shopGroup.add(shopDeck);
+
+        const backWall = new THREE.Mesh(new THREE.BoxGeometry(6.4, 3.1, 0.18), wallCreamMat);
+        backWall.position.set(0, 1.65, -1.95);
+        backWall.castShadow = true;
+        shopGroup.add(backWall);
+
+        for (const sx of [-3.15, 3.15]) {
+            const sideWall = new THREE.Mesh(new THREE.BoxGeometry(0.18, 3.1, 3.8), wallCreamMat);
+            sideWall.position.set(sx, 1.65, -0.15);
+            sideWall.castShadow = true;
+            shopGroup.add(sideWall);
+        }
+
+        // 4 Trụ sắt hộp mặt tiền + Mái ngói tôn đỏ đô đua hiên che mưa nắng
+        for (const px of [-3.1, 3.1]) {
+            const frontPillar = new THREE.Mesh(new THREE.BoxGeometry(0.16, 3.25, 0.16), darkFrameMat);
+            frontPillar.position.set(px, 1.7, 1.85);
+            shopGroup.add(frontPillar);
+        }
+        const mainShopRoof = new THREE.Mesh(new THREE.BoxGeometry(7.3, 0.20, 5.2), shopRoofMat);
+        mainShopRoof.position.set(0, 3.32, 0.05);
+        mainShopRoof.rotation.x = 0.09;
+        mainShopRoof.castShadow = true;
+        shopGroup.add(mainShopRoof);
+
+        // Hiên bạt kẻ sọc Đỏ - Vàng che quầy phao phía trước
+        const awningMat = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.65 });
+        const frontAwning = new THREE.Mesh(new THREE.BoxGeometry(6.9, 0.08, 1.25), awningMat);
+        frontAwning.position.set(0, 2.88, 2.32);
+        frontAwning.rotation.x = 0.28;
+        shopGroup.add(frontAwning);
+
+        // 2. BẢNG HIỆU HỘP ĐÈN PHÁT SÁNG TRÊN NÓC TIỆM ĐỒ CÂU (2 mặt rõ nét cả ngày lẫn đêm!)
+        const signCanvas = document.createElement('canvas');
+        signCanvas.width = 1024;
+        signCanvas.height = 256;
+        const sCtx = signCanvas.getContext('2d');
+        const bgGrad = sCtx.createLinearGradient(0, 0, 1024, 256);
+        bgGrad.addColorStop(0, '#0f172a');
+        bgGrad.addColorStop(0.5, '#1e1b4b');
+        bgGrad.addColorStop(1, '#0f172a');
+        sCtx.fillStyle = bgGrad;
+        sCtx.fillRect(0, 0, 1024, 256);
+        sCtx.strokeStyle = '#facc15';
+        sCtx.lineWidth = 12;
+        sCtx.strokeRect(8, 8, 1008, 240);
+        sCtx.fillStyle = '#fde047';
+        sCtx.font = '900 56px "Segoe UI", sans-serif';
+        sCtx.textAlign = 'center';
+        sCtx.fillText('🏪 TIỆM ĐỒ CÂU ĐÀI & MỒI HƯƠNG', 512, 96);
+        sCtx.fillStyle = '#38bdf8';
+        sCtx.font = 'bold 34px "Segoe UI", sans-serif';
+        sCtx.fillText('PHAO HỐ ĐẤU • CẦN ĐÀI • CÁM NỀN • ỐC BƯƠU • NGÔ NGỌT', 512, 162);
+        sCtx.fillStyle = '#4ade80';
+        sCtx.font = 'bold 30px "Segoe UI", sans-serif';
+        sCtx.fillText('👉 LẠI GẦN BẤM [PHÍM E / PHÍM B] ĐỂ VÀO MUA ĐỒ!', 512, 218);
+
+        const signTex = new THREE.CanvasTexture(signCanvas);
+        const signBoard = new THREE.Mesh(
+            new THREE.BoxGeometry(6.5, 1.35, 0.22),
+            new THREE.MeshBasicMaterial({ map: signTex })
+        );
+        signBoard.position.set(0, 4.12, 1.55);
+        shopGroup.add(signBoard);
+
+        // 3. QUẦY THU NGÂN & TỦ KÍNH TRƯNG BÀY PHAO ĐÀI / PHAO HỐ ĐẤU Ở MẶT TIỀN
+        const counterWoodMat = new THREE.MeshStandardMaterial({ color: 0x92400e, roughness: 0.55 });
+        const glassMat = new THREE.MeshPhysicalMaterial({
+            color: 0xe0f2fe,
+            transparent: true,
+            opacity: 0.42,
+            roughness: 0.08,
+            metalness: 0.1
+        });
+        const counterBase = new THREE.Mesh(new THREE.BoxGeometry(3.8, 0.78, 0.92), counterWoodMat);
+        counterBase.position.set(-0.55, 0.55, 1.25);
+        shopGroup.add(counterBase);
+
+        const glassCase = new THREE.Mesh(new THREE.BoxGeometry(3.76, 0.42, 0.88), glassMat);
+        glassCase.position.set(-0.55, 1.15, 1.25);
+        shopGroup.add(glassCase);
+
+        // Dàn Phao Câu Đài & Phao Hố Đấu 3D đầy màu sắc trưng bày trong tủ kính
+        const floatColors = [0xef4444, 0xfacc15, 0x22c55e, 0x38bdf8, 0xf97316];
+        for (let fi = 0; fi < 10; fi++) {
+            const fx = -2.05 + fi * 0.33;
+            const fltStand = new THREE.Group();
+            fltStand.position.set(fx, 1.08, 1.25);
+            fltStand.rotation.z = -0.18;
+            const body = new THREE.Mesh(
+                new THREE.SphereGeometry(0.032, 10, 8),
+                new THREE.MeshStandardMaterial({ color: floatColors[fi % floatColors.length], roughness: 0.25 })
+            );
+            body.scale.set(0.75, 1.85, 0.75);
+            fltStand.add(body);
+            const tail = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.006, 0.008, 0.22, 6),
+                new THREE.MeshBasicMaterial({ color: fi % 2 === 0 ? 0xff2a00 : 0xffee00 })
+            );
+            tail.position.y = 0.14;
+            fltStand.add(tail);
+            shopGroup.add(fltStand);
+        }
+
+        // 4. GIÁ GỖ DỰNG 8 CÂY CẦN CÂU ĐÀI CARBON 3D BÊN PHẢI TIỆM
+        const rackFrame = new THREE.Mesh(new THREE.BoxGeometry(1.45, 1.15, 0.48), darkFrameMat);
+        rackFrame.position.set(2.15, 0.72, 1.12);
+        shopGroup.add(rackFrame);
+
+        const rodColors = [0x7f1d1d, 0x0f5c5c, 0x111827, 0x1a3a2f, 0x991b1b, 0x0284c7, 0x451a03, 0x1e1b4b];
+        for (let ri = 0; ri < 8; ri++) {
+            const rx = 1.56 + ri * 0.168;
+            const rodDisplay = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.007, 0.020, 2.75, 8),
+                new THREE.MeshStandardMaterial({ color: rodColors[ri], metalness: 0.68, roughness: 0.22 })
+            );
+            rodDisplay.position.set(rx, 1.55, 1.12);
+            rodDisplay.rotation.z = -0.04;
+            shopGroup.add(rodDisplay);
+
+            const goldBand = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.021, 0.021, 0.06, 8),
+                new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.85, roughness: 0.2 })
+            );
+            goldBand.position.set(rx + 0.02, 0.78, 1.12);
+            shopGroup.add(goldBand);
+        }
+
+        // 5. KỆ 3 TẦNG CHAI HƯƠNG LIỆU / RƯỢU THUỐC BẮC / NƯỚC XANH PHÍA SAU + BAO CÁM & RỔ ỐC NGÔ TRƯỚC HIÊN
+        for (let sy = 0; sy < 3; sy++) {
+            const shelf = new THREE.Mesh(new THREE.BoxGeometry(5.2, 0.07, 0.46), counterWoodMat);
+            shelf.position.set(0, 0.95 + sy * 0.68, -1.62);
+            shopGroup.add(shelf);
+
+            for (let bi = 0; bi < 9; bi++) {
+                const bx = -2.1 + bi * 0.52;
+                const bCol = (bi + sy) % 3 === 0 ? 0x10b981 : ((bi + sy) % 3 === 1 ? 0xd97706 : 0x7c2d12);
+                const bottle = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.055, 0.062, 0.26, 8),
+                    new THREE.MeshStandardMaterial({ color: bCol, roughness: 0.25, metalness: 0.15 })
+                );
+                bottle.position.set(bx, 1.12 + sy * 0.68, -1.60);
+                shopGroup.add(bottle);
+            }
+        }
+
+        // Các bao Cám Nền 25kg & Chậu Ốc Tươi / Rổ Ngô Ngọt đặt ngay bậc hiên cửa hàng
+        const sackMat = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.88 });
+        for (let si = 0; si < 3; si++) {
+            const sack = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.34, 0.38), sackMat);
+            sack.position.set(-2.55, 0.32 + (si === 2 ? 0.32 : 0), 2.05 - (si === 1 ? 0.42 : 0));
+            sack.rotation.y = si * 0.18;
+            shopGroup.add(sack);
+        }
+        const basinBlueMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.45 });
+        const snailTub = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.28, 0.26, 14), basinBlueMat);
+        snailTub.position.set(1.55, 0.29, 2.05);
+        shopGroup.add(snailTub);
+        const snailFill = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.33, 0.33, 0.05, 12),
+            new THREE.MeshStandardMaterial({ color: 0x292524, roughness: 0.7 })
+        );
+        snailFill.position.set(1.55, 0.40, 2.05);
+        shopGroup.add(snailFill);
+
+        const cornTub = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.26, 0.24, 14), counterWoodMat);
+        cornTub.position.set(2.35, 0.28, 2.05);
+        shopGroup.add(cornTub);
+        const cornFill = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.31, 0.31, 0.05, 12),
+            new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.55 })
+        );
+        cornFill.position.set(2.35, 0.39, 2.05);
+        shopGroup.add(cornFill);
+
+        // 6. NPC ÔNG CHỦ TIỆM ĐỒ CÂU ĐÀI ĐỨNG SAU QUẦY KÍNH + ĐÈN VÀNG ẤM CHIẾU SÁNG TIỆM
+        this.tackleShopKeeper = createRealisticHumanCharacter({
+            pose: 'STANDING',
+            shirtColor: 0x059669,
+            vestColor: 0x0f172a,
+            pantsColor: 0x1e293b,
+            hatColor: 0xf59e0b,
+            hatType: 'CAP',
+            hasVest: true
+        });
+        this.tackleShopKeeper.position.set(-0.55, 0.16, 0.38);
+        this.tackleShopKeeper.rotation.y = 0;
+
+        const keeperCanvas = document.createElement('canvas');
+        keeperCanvas.width = 512;
+        keeperCanvas.height = 112;
+        const kCtx = keeperCanvas.getContext('2d');
+        kCtx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+        kCtx.fillRect(0, 0, 512, 112);
+        kCtx.strokeStyle = '#f59e0b';
+        kCtx.lineWidth = 6;
+        kCtx.strokeRect(4, 4, 504, 104);
+        kCtx.fillStyle = '#fde047';
+        kCtx.font = 'bold 30px "Segoe UI", sans-serif';
+        kCtx.textAlign = 'center';
+        kCtx.fillText('🏪 CHỦ TIỆM ĐỒ CÂU LÁN TRẠI', 256, 46);
+        kCtx.fillStyle = '#4ade80';
+        kCtx.font = 'bold 23px "Segoe UI", sans-serif';
+        kCtx.fillText('Phao Hố Đấu • Cần • Mồi (Bấm E)', 256, 86);
+
+        const keeperSprite = new THREE.Sprite(
+            new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(keeperCanvas), transparent: true })
+        );
+        keeperSprite.position.set(0, 2.22, 0);
+        keeperSprite.scale.set(2.9, 0.66, 1);
+        this.tackleShopKeeper.add(keeperSprite);
+        shopGroup.add(this.tackleShopKeeper);
+
+        const shopWarmLight = new THREE.PointLight(0xffedd5, 2.4, 18);
+        shopWarmLight.position.set(0, 2.75, 1.2);
+        shopGroup.add(shopWarmLight);
+
+        campGroup.add(shopGroup);
 
         this.lakeGroup.add(campGroup);
     }
@@ -2451,6 +2705,15 @@ export class Environment {
             // Chủ hồ vẫy tay mời anh em cần thủ vào chạy chỗ khi cổng mở
             const wave = this.isGateOpen ? (-0.95 + Math.sin(now * 6.0) * 0.28) : -0.15;
             this.gateOwner.userData.rightArm.shoulderPivot.rotation.x = wave;
+        }
+        if (this.tackleShopKeeper && this.tackleShopKeeper.userData) {
+            const sk = this.tackleShopKeeper.userData;
+            if (sk.rightArm) {
+                sk.rightArm.shoulderPivot.rotation.x = -0.55 + Math.sin(now * 3.4) * 0.22;
+            }
+            if (sk.headGroup) {
+                sk.headGroup.rotation.y = Math.sin(now * 1.4) * 0.24;
+            }
         }
 
         // 6. Hoạt ảnh bước đi của nhân viên hồ câu (Đi ra bến thu tiền vé Ca 5h/10h/15h hoặc đi tuần quanh hồ)
