@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { createRealisticHumanCharacter } from '../world/HumanCharacterBuilder.js';
+import { buildRealisticFish } from '../world/FishModelBuilder.js';
 
 /**
  * KIẾN TRÚC MẠNG MULTIPLAYER REALTIME & HỆ THỐNG BẠN CÂU 3D SỐNG ĐỘNG QUANH HỒ
@@ -460,35 +461,47 @@ export class NetworkManager {
         keepnet.position.set(-0.95, -0.18, 1.55);
         pierPropsGroup.add(keepnet);
 
-        // 2. Ô Dù Câu Đài Chuyên Nghiệp 2 Tầng Thoáng Gió
+        // 2. Ô Dù Câu Đài Vòm Parabol 12 Múi 2 Tầng Thoáng Gió + Diềm Rủ Chắn Nắng
         const umbrella = new THREE.Group();
         const pole = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.028, 0.032, 2.55, 10),
-            new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.85, roughness: 0.15 })
+            new THREE.CylinderGeometry(0.026, 0.030, 2.52, 10),
+            new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.88, roughness: 0.16 })
         );
         pole.position.y = 1.25;
         umbrella.add(pole);
 
-        const canopy = new THREE.Mesh(
-            new THREE.ConeGeometry(1.75, 0.55, 16),
-            new THREE.MeshStandardMaterial({ color: cfg.umbrellaColor, roughness: 0.45, side: THREE.DoubleSide })
-        );
-        canopy.position.y = 2.42;
+        if (!this._sharedBotUmbGeo) {
+            const pts = [];
+            for (let s = 0; s <= 10; s++) {
+                const u = s / 10;
+                pts.push(new THREE.Vector2(u * 1.62, 0.42 * (1.0 - Math.pow(u, 1.7))));
+            }
+            this._sharedBotUmbGeo = new THREE.LatheGeometry(pts, 12);
+            this._sharedBotValanceGeo = new THREE.CylinderGeometry(1.62, 1.65, 0.09, 12, 1, true);
+        }
+        const canopyMat = new THREE.MeshStandardMaterial({ color: cfg.umbrellaColor, roughness: 0.45, side: THREE.DoubleSide });
+        const canopy = new THREE.Mesh(this._sharedBotUmbGeo, canopyMat);
+        canopy.position.y = 2.18;
         canopy.castShadow = true;
         umbrella.add(canopy);
 
+        const valance = new THREE.Mesh(this._sharedBotValanceGeo, canopyMat);
+        valance.position.y = 2.135;
+        umbrella.add(valance);
+
         const topVent = new THREE.Mesh(
-            new THREE.ConeGeometry(0.65, 0.26, 16),
-            new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.5, side: THREE.DoubleSide })
+            new THREE.ConeGeometry(0.68, 0.22, 12, 1, true),
+            new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.35, metalness: 0.5, side: THREE.DoubleSide })
         );
-        topVent.position.y = 2.66;
+        topVent.position.y = 2.60;
         umbrella.add(topVent);
 
         umbrella.position.set(-0.88, 0.1, -0.35);
         umbrella.rotation.z = -0.10;
+        umbrella.rotation.x = 0.08;
         pierPropsGroup.add(umbrella);
 
-        // 3. Thùng Câu Đài Địa Hình 4 Chân Inox + Khay Mồi Từ Tính
+        // 3. Thùng Câu Đài Địa Hình 4 Chân Inox + Bộ Khay Mồi Đa Tầng + Đèn Soi Phao Đêm Ánh Xanh
         const seatBox = new THREE.Mesh(
             new THREE.BoxGeometry(0.48, 0.42, 0.38),
             new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.55, roughness: 0.28 })
@@ -505,10 +518,41 @@ export class NetworkManager {
 
         const tray = new THREE.Mesh(
             new THREE.CylinderGeometry(0.16, 0.16, 0.022, 18),
-            new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.3 })
+            new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.3, metalness: 0.35 })
         );
         tray.position.set(-0.34, 0.48, -0.08);
         pierPropsGroup.add(tray);
+
+        const lowerTray = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.12, 0.11, 0.026, 16),
+            new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.85 })
+        );
+        lowerTray.position.set(-0.42, 0.43, 0.04);
+        pierPropsGroup.add(lowerTray);
+
+        // Luồng tia Đèn Soi Phao Ánh Xanh Lam của bạn câu (tự bật sáng khi hồ tới 18:00 tối!)
+        if (!this._sharedBotBeamGeo) {
+            const bGeo = new THREE.CylinderGeometry(0.02, 0.28, 5.2, 12, 1, true);
+            bGeo.translate(0, -2.6, 0);
+            bGeo.rotateX(-Math.PI / 2);
+            this._sharedBotBeamGeo = bGeo;
+        }
+        const botNightBeam = new THREE.Mesh(
+            this._sharedBotBeamGeo,
+            new THREE.MeshBasicMaterial({
+                color: 0x38bdf8,
+                transparent: true,
+                opacity: 0.075,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+                side: THREE.DoubleSide
+            })
+        );
+        botNightBeam.position.set(0.18, 0.52, -0.10);
+        botNightBeam.rotation.x = 0.14;
+        botNightBeam.visible = false;
+        pierPropsGroup.add(botNightBeam);
+        group.userData.botNightBeam = botNightBeam;
 
         // 4. Nhân Vật Bạn Câu 3D (Có thể chuyển mượt từ Ngồi Câu -> Đứng Dậy Lùi Về Sau Bo Cá -> Bước Lên Hớt Vợt)
         const anglerHuman = createRealisticHumanCharacter({
@@ -604,25 +648,40 @@ export class NetworkManager {
         fishingLine.frustumCulled = false;
         group.add(fishingLine);
 
-        // 7. PHAO ĐÀI 3D CỦA BẠN CÂU TRÊN MẶT NƯỚC (Nổi dập dềnh & Thụt mất hình khi cá cắn)
+        // 7. PHAO ĐÀI 3D CỦA BẠN CÂU TRÊN MẶT NƯỚC (Hỗ trợ Phao Đêm OLED Phát Sáng Xanh Ngọc / Đỏ Hồng từ 18:00 tối!)
         const botFloatGroup = new THREE.Group();
         const floatBelly = new THREE.Mesh(
-            new THREE.SphereGeometry(0.028, 12, 12),
+            new THREE.SphereGeometry(0.026, 12, 12),
             new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.2 })
         );
         floatBelly.scale.set(1, 2.2, 1);
         floatBelly.position.y = -0.04;
         botFloatGroup.add(floatBelly);
 
+        const botFloatTipMat = new THREE.MeshBasicMaterial({ color: 0xff2a00 });
         const floatTip = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.006, 0.005, 0.24, 8),
-            new THREE.MeshBasicMaterial({ color: 0xff2a00 })
+            new THREE.CylinderGeometry(0.0065, 0.0055, 0.26, 8),
+            botFloatTipMat
         );
-        floatTip.position.y = 0.12;
+        floatTip.position.y = 0.13;
         botFloatGroup.add(floatTip);
 
+        const botFloatHaloMat = new THREE.MeshBasicMaterial({
+            color: 0x00ffd5,
+            transparent: true,
+            opacity: 0.0,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
+        });
+        const floatOledHalo = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.020, 0.020, 0.28, 8),
+            botFloatHaloMat
+        );
+        floatOledHalo.position.y = 0.13;
+        botFloatGroup.add(floatOledHalo);
+
         const floatRing = new THREE.Mesh(
-            new THREE.RingGeometry(0.015, 0.065, 18),
+            new THREE.RingGeometry(0.015, 0.068, 18),
             new THREE.MeshBasicMaterial({ color: 0xe0f2fe, transparent: true, opacity: 0.65, side: THREE.DoubleSide })
         );
         floatRing.rotation.x = -Math.PI / 2;
@@ -631,45 +690,17 @@ export class NetworkManager {
 
         botFloatGroup.position.set(0, -0.25, 5.4);
         group.add(botFloatGroup);
+        group.userData.botFloatTipMat = botFloatTipMat;
+        group.userData.botFloatHaloMat = botFloatHaloMat;
 
-        // 8. CÁ CHÉP CỦ 3D CỦA BẠN CÂU (Quẫy nước, chạy ngang, nổi ngửa bụng & nằm gọn trong vợt khi hớt lên!)
+        // 8. CÁ 3D GIẢI PHẪU THẬT CỦA BẠN CÂU (Dùng chung FishModelBuilder: Vảy 3D, Nắp Mang, Tia Vây, Râu Chép!)
+        const botSpeciesPool = ['OLD_CARP', 'CARP', 'BLACK_CARP', 'GRASS_CARP'];
+        const chosenSp = botSpeciesPool[idx % botSpeciesPool.length];
         const botFishGroup = new THREE.Group();
         botFishGroup.visible = false;
-
-        const fishBodyGeo = new THREE.SphereGeometry(0.19, 16, 12);
-        fishBodyGeo.scale(0.62, 1.05, 2.65);
-        const fishBody = new THREE.Mesh(
-            fishBodyGeo,
-            new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.5, roughness: 0.25 })
-        );
-        botFishGroup.add(fishBody);
-
-        const fishBellyGeo = new THREE.SphereGeometry(0.175, 12, 10);
-        fishBellyGeo.scale(0.58, 0.88, 2.4);
-        const fishBelly = new THREE.Mesh(
-            fishBellyGeo,
-            new THREE.MeshStandardMaterial({ color: 0xfef3c7, roughness: 0.35 })
-        );
-        fishBelly.position.y = -0.035;
-        botFishGroup.add(fishBelly);
-
-        const fishTailGeo = new THREE.ConeGeometry(0.21, 0.36, 4);
-        fishTailGeo.scale(0.18, 1.0, 1.0);
-        const botFishTail = new THREE.Mesh(
-            fishTailGeo,
-            new THREE.MeshStandardMaterial({ color: 0xb45309 })
-        );
-        botFishTail.rotation.x = -Math.PI / 2;
-        botFishTail.position.set(0, 0, -0.52);
-        botFishGroup.add(botFishTail);
-
-        const dorsalFin = new THREE.Mesh(
-            new THREE.BoxGeometry(0.02, 0.15, 0.34),
-            new THREE.MeshStandardMaterial({ color: 0xb45309 })
-        );
-        dorsalFin.position.set(0, 0.17, 0);
-        botFishGroup.add(dorsalFin);
-
+        const realBotFish = buildRealisticFish(chosenSp, 7.5, { noScale: true });
+        botFishGroup.add(realBotFish);
+        const botFishTail = realBotFish.userData ? realBotFish.userData.tailPivot : null;
         group.add(botFishGroup);
 
         // Vòng bọt nước trắng xóa nơi cá quẫy
@@ -909,13 +940,31 @@ export class NetworkManager {
                 botFishGroup.visible = false;
                 botWaterSpray.visible = false;
 
-                // Phao dập dềnh; 1.1s cuối trước khi đóng cá thì phao thụt lút mất hình!
+                const curH = (bubbleSystem && typeof bubbleSystem.currentHour === 'number')
+                    ? ((bubbleSystem.currentHour % 24) + 24) % 24
+                    : 9.0;
+                const isNight18 = (curH >= 18.0 || curH < 5.8);
+                if (udGroup.botNightBeam) {
+                    udGroup.botNightBeam.visible = isNight18;
+                }
+
+                // Phao dập dềnh; 1.1s cuối trước khi đóng cá thì phao thụt lút mất hình (& đổi Đỏ Hồng nếu là Phao Đêm OLED)!
                 if (bot.actionTimer < 1.1) {
                     const biteDip = Math.min(0.14, (1.1 - bot.actionTimer) * 0.18);
                     botFloatGroup.position.set(0, -0.25 - biteDip, 5.4);
+                    if (udGroup.botFloatTipMat && udGroup.botFloatHaloMat) {
+                        udGroup.botFloatTipMat.color.setHex(isNight18 ? 0xff1744 : 0xff2a00);
+                        udGroup.botFloatHaloMat.color.setHex(0xff1744);
+                        udGroup.botFloatHaloMat.opacity = isNight18 ? 0.62 : 0.0;
+                    }
                     this.updateAnglerBadge(group, `⚡ ${bot.name}`, `Phao đang thụt lút! Chuẩn bị giật!`, '#f59e0b');
                 } else {
                     botFloatGroup.position.set(0, -0.25 + Math.sin(now * 2.8 + bot.phaseOffset) * 0.008, 5.4);
+                    if (udGroup.botFloatTipMat && udGroup.botFloatHaloMat) {
+                        udGroup.botFloatTipMat.color.setHex(isNight18 ? 0x00ffd5 : 0xff2a00);
+                        udGroup.botFloatHaloMat.color.setHex(0x00ffd5);
+                        udGroup.botFloatHaloMat.opacity = isNight18 ? 0.45 : 0.0;
+                    }
                     this.updateAnglerBadge(group, `🎣 ${bot.name}`, `Đang câu: ${bot.baitUsed.slice(0, 26)}`, '#38bdf8');
                 }
 

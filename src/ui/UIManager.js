@@ -4011,6 +4011,9 @@ export class UIManager {
 
         this.playerMoney += earned;
         this.fishKeepnet = [];
+        if (this.gameplay && typeof this.gameplay.clearKeepnetVisuals === 'function') {
+            this.gameplay.clearKeepnetVisuals();
+        }
         this.updateMoneyUI();
         this.renderKeepnet();
         soundManager.playCatchFanfare();

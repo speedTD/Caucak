@@ -202,6 +202,10 @@ export class FishingGameplay {
         this.floatOledCollarGlow = null;
         this.floatNightWaterGlow = null;
         this.floatNightPointLight = null;
+        this.nightLampBeamMesh = null;
+        this.nightLampLensMat = null;
+        this.keepnetFishList = [];
+        this.groundBaitProjectiles = [];
 
         // Hệ thống cấp độ 7 trang bị câu đài & Bộ Set Trục/Thẻo/Cân Phao/Cần khởi đầu
         this.equipmentLevels = getDefaultEquipmentLevels();
@@ -763,7 +767,59 @@ export class FishingGameplay {
         keepnetMesh.position.set(-0.48, -0.68, -1.43);
         this.keepnetGroup.add(keepnetMesh);
 
+        // Ngăn chứa Cá Sống 3D bơi lấp ló & quẫy nhẹ bên trong Rọng Cá khi đã câu được cá!
+        this.keepnetFishContainer = new THREE.Group();
+        this.keepnetFishContainer.position.set(-0.48, -0.58, -1.36);
+        this.keepnetGroup.add(this.keepnetFishContainer);
+
         this.rodRestSupport.add(this.keepnetGroup);
+
+        // 2E. ĐÈN SOI PHAO CÂU ĐÀI BAN ĐÊM KẸP THÙNG (Ánh xanh lam dịu chiếu dọc thân cần ra mặt nước từ 18:00 tối!)
+        this.nightLampGroup = new THREE.Group();
+        const lampBody = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.022, 0.026, 0.095, 14),
+            darkCarbonMat
+        );
+        lampBody.rotation.x = Math.PI / 2.15;
+        this.nightLampGroup.add(lampBody);
+
+        const lampRing = new THREE.Mesh(
+            new THREE.TorusGeometry(0.023, 0.0035, 8, 18),
+            anodBlueMat
+        );
+        lampRing.position.set(0, 0.004, -0.046);
+        this.nightLampGroup.add(lampRing);
+
+        this.nightLampLensMat = new THREE.MeshBasicMaterial({ color: 0x1e293b });
+        const lampLens = new THREE.Mesh(new THREE.CircleGeometry(0.021, 16), this.nightLampLensMat);
+        lampLens.rotation.y = Math.PI;
+        lampLens.position.set(0, 0.004, -0.048);
+        this.nightLampGroup.add(lampLens);
+
+        // Luồng tia sáng xanh tím mảnh rọi từ đèn kẹp thùng hướng ra điểm phao câu ban đêm
+        const beamGeo = new THREE.CylinderGeometry(0.018, 0.24, 5.2, 16, 1, true);
+        beamGeo.translate(0, -2.6, 0);
+        beamGeo.rotateX(Math.PI / 2);
+        this.nightLampBeamMesh = new THREE.Mesh(
+            beamGeo,
+            new THREE.MeshBasicMaterial({
+                color: 0x38bdf8,
+                transparent: true,
+                opacity: 0.065,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+                side: THREE.DoubleSide
+            })
+        );
+        this.nightLampBeamMesh.position.set(0, 0.004, -0.05);
+        this.nightLampBeamMesh.rotation.x = -0.065;
+        this.nightLampBeamMesh.rotation.y = 0.04;
+        this.nightLampBeamMesh.visible = false;
+        this.nightLampGroup.add(this.nightLampBeamMesh);
+
+        this.nightLampGroup.position.set(-0.14, -0.34, -0.78);
+        this.rodRestSupport.add(this.nightLampGroup);
+
         this.fpvRig.add(this.rodRestSupport);
 
         // 3. CẦN CÂU ĐÀI CARBON LIỀN KHỐI UỐN CONG MƯỢT MÀ (SEAMLESS CONTINUOUS DEFORMABLE CARBON POLE)
@@ -2583,7 +2639,44 @@ export class FishingGameplay {
         const baitSpotX = this.camera.position.x + forward.x * castDist;
         const baitSpotZ = this.camera.position.z + forward.z * castDist;
 
-        this.bubbleSystem.addGroundBaitSpot(baitSpotX, baitSpotZ, this.activeGroundBait);
+        // Sinh nắm mồi xả 3D (Cám / Ốc / Ngô) bay vút vòng cung từ Khay Mồi của cần thủ ra đúng ổ câu!
+        const right = new THREE.Vector3(-forward.z, 0, forward.x);
+        const startPos = new THREE.Vector3()
+            .copy(this.camera.position)
+            .addScaledVector(right, -0.32)
+            .addScaledVector(forward, 0.55);
+        startPos.y -= 0.25;
+
+        const mode = (this.activeGroundBait && this.activeGroundBait.fishingMode) || 'CAM';
+        const lumpColor = mode === 'CORN' ? 0xfacc15 : (mode === 'SNAIL' ? 0x44403c : 0xb45309);
+        const lumpGroup = new THREE.Group();
+        const coreBall = new THREE.Mesh(
+            new THREE.DodecahedronGeometry(0.052, 1),
+            new THREE.MeshStandardMaterial({ color: lumpColor, roughness: 0.88 })
+        );
+        lumpGroup.add(coreBall);
+        for (let k = 0; k < 4; k++) {
+            const subGrain = new THREE.Mesh(
+                new THREE.SphereGeometry(0.016, 6, 6),
+                new THREE.MeshStandardMaterial({ color: mode === 'SNAIL' ? 0x1c1917 : 0xfde047, roughness: 0.5 })
+            );
+            const a = (k / 4) * Math.PI * 2;
+            subGrain.position.set(Math.cos(a) * 0.036, (k % 2) * 0.018, Math.sin(a) * 0.036);
+            lumpGroup.add(subGrain);
+        }
+        lumpGroup.position.copy(startPos);
+        this.scene.add(lumpGroup);
+
+        const groundBaitRef = { ...this.activeGroundBait };
+        this.groundBaitProjectiles.push({
+            mesh: lumpGroup,
+            start: startPos,
+            end: new THREE.Vector3(baitSpotX, 0.02, baitSpotZ),
+            elapsed: 0,
+            duration: 0.56,
+            baitData: groundBaitRef
+        });
+
         this.groundBaitsCastCount += 1;
         // Xả mồi giúp trấn an đàn cá và hồi phục ổ nhanh chóng sau khi giật trượt
         this.consecutiveMisses = Math.max(0, this.consecutiveMisses - 1);
@@ -2591,10 +2684,11 @@ export class FishingGameplay {
             this.waitFishTimer = Math.min(this.waitFishTimer, 8.0);
         }
 
-        const rem = typeof this.activeGroundBait.charges === 'number' ? ` (Còn ${this.activeGroundBait.charges} nắm xả)` : '';
+        const uG = this.activeGroundBait.unitLabel || 'nắm xả';
+        const rem = typeof this.activeGroundBait.charges === 'number' ? ` (Còn ${this.activeGroundBait.charges} ${uG})` : '';
         return {
             success: true,
-            message: `🥣 Đã ném mồi xả [${this.activeGroundBait.name}]${rem}! Mùi thơm lan tỏa trấn an đàn cá, dẫn dụ cá vào ổ!`
+            message: `🥣 Đã ném [${this.activeGroundBait.name}] bay ra ổ${rem}! Mùi thơm lan tỏa trấn an đàn cá, dẫn dụ cá vào ổ!`
         };
     }
 
@@ -4135,11 +4229,43 @@ export class FishingGameplay {
         this.landingNetGroup.visible = false;
         this.rodRestSupport.visible = true;
         this.isNettingAnim = false;
+        this.addFishToKeepnetVisual(resultFish.speciesKey || 'CARP', resultFish.weight || 3.5);
 
         return {
             success: true,
             fish: resultFish
         };
+    }
+
+    // Thả thêm mô hình Cá 3D bơi lấp ló bên trong Rọng Cá Ngâm Nước góc trái sau khi hớt vợt thành công
+    addFishToKeepnetVisual(speciesKey = 'CARP', weight = 3.5) {
+        if (!this.keepnetFishContainer) return;
+        // Hiển thị tối đa 4 con cá tiêu biểu trong lòng rọng để mượt 60 FPS
+        if (this.keepnetFishList.length >= 4) {
+            const oldest = this.keepnetFishList.shift();
+            if (oldest && oldest.mesh) this.keepnetFishContainer.remove(oldest.mesh);
+        }
+        const idx = this.keepnetFishList.length;
+        const fishMesh = buildRealisticFish(speciesKey, weight, { noScale: true });
+        const sc = THREE.MathUtils.clamp(0.22 + (weight / 18.0) * 0.14, 0.20, 0.36);
+        fishMesh.scale.setScalar(sc);
+        fishMesh.position.set(0, -0.04 - idx * 0.055, 0);
+        this.keepnetFishContainer.add(fishMesh);
+        this.keepnetFishList.push({
+            mesh: fishMesh,
+            tailPivot: fishMesh.userData ? fishMesh.userData.tailPivot : null,
+            phase: Math.random() * Math.PI * 2,
+            speed: 1.4 + Math.random() * 0.9,
+            depthOffset: -0.03 - idx * 0.055
+        });
+    }
+
+    clearKeepnetVisuals() {
+        if (!this.keepnetFishContainer) return;
+        while (this.keepnetFishContainer.children.length > 0) {
+            this.keepnetFishContainer.remove(this.keepnetFishContainer.children[0]);
+        }
+        this.keepnetFishList = [];
     }
 
     update(delta) {
@@ -4178,6 +4304,57 @@ export class FishingGameplay {
             const lerpU = Math.min(1, delta * 6.5);
             this.umbrellaHeadPivot.rotation.x += (targetTiltX + Math.sin(nowS) * windAmp - this.umbrellaHeadPivot.rotation.x) * lerpU;
             this.umbrellaHeadPivot.rotation.z += (targetTiltZ + Math.cos(nowS * 1.3) * windAmp - this.umbrellaHeadPivot.rotation.z) * lerpU;
+        }
+
+        // 1B. Cập nhật Đèn Soi Phao Câu Đêm Kẹp Thùng (Tự bật ánh xanh lam dịu từ 18:00 tối!)
+        const isNightNow = this.isNightFloatTime();
+        if (this.nightLampBeamMesh && this.nightLampLensMat) {
+            const lampOn = isNightNow && (
+                this.state === FISHING_STATES.SEATED ||
+                this.state === FISHING_STATES.CASTING ||
+                this.state === FISHING_STATES.FLOAT_WAIT ||
+                this.state === FISHING_STATES.BITING
+            );
+            this.nightLampBeamMesh.visible = lampOn;
+            this.nightLampLensMat.color.setHex(lampOn ? 0x38bdf8 : 0x1e293b);
+        }
+
+        // 1C. Cập nhật các Nắm Mồi Xả 3D đang bay vòng cung ra ổ câu
+        if (this.groundBaitProjectiles && this.groundBaitProjectiles.length > 0) {
+            for (let i = this.groundBaitProjectiles.length - 1; i >= 0; i--) {
+                const prj = this.groundBaitProjectiles[i];
+                prj.elapsed += delta;
+                const p = Math.min(1.0, prj.elapsed / prj.duration);
+                prj.mesh.position.lerpVectors(prj.start, prj.end, p);
+                prj.mesh.position.y += Math.sin(p * Math.PI) * 1.15;
+                prj.mesh.rotation.x += delta * 6.5;
+                prj.mesh.rotation.z += delta * 4.2;
+
+                if (p >= 1.0) {
+                    this.scene.remove(prj.mesh);
+                    soundManager.playWaterSplash(0.88);
+                    this.bubbleSystem.spawnRipple(prj.end.x, prj.end.z, 1.35);
+                    this.spawnWaterSprayBurst(prj.end.x, prj.end.z, 9, 2.2, 1.35);
+                    this.bubbleSystem.addGroundBaitSpot(prj.end.x, prj.end.z, prj.baitData);
+                    this.groundBaitProjectiles.splice(i, 1);
+                }
+            }
+        }
+
+        // 1D. Cập nhật đàn Cá 3D bơi lượn & vẫy đuôi bên trong Rọng Cá Ngâm Nước
+        if (this.keepnetFishList && this.keepnetFishList.length > 0) {
+            const tSec = performance.now() * 0.001;
+            for (let i = 0; i < this.keepnetFishList.length; i++) {
+                const kf = this.keepnetFishList[i];
+                const ang = tSec * kf.speed + kf.phase;
+                kf.mesh.position.x = Math.cos(ang) * 0.068;
+                kf.mesh.position.z = Math.sin(ang) * 0.068;
+                kf.mesh.position.y = kf.depthOffset + Math.sin(ang * 1.7) * 0.014;
+                kf.mesh.rotation.y = -ang;
+                if (kf.tailPivot) {
+                    kf.tailPivot.rotation.y = Math.sin(tSec * 11.0 + kf.phase) * 0.36;
+                }
+            }
         }
 
         const fPos = this.floatTargetPos;
