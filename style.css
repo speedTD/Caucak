@@ -5561,12 +5561,125 @@ body, html {
 }
 
 
-/* ==================== NÚT KÍCH MỒI (30% SAU 5S BẤM GIỮ 2-3 VẠCH) & PHAO ĐÊM OLED (18:00) ==================== */
-.strike-inline-bar {
+/* ==================== CỤM NÚT HÌNH TRÒN GIẬT CẦN & KÍCH MỒI + PHAO ĐÊM OLED (18:00) ==================== */
+.radar-box {
+    display: none !important;
+}
+
+.strike-huge-btn-container {
+    position: fixed !important;
+    bottom: 26px !important;
+    right: 26px !important;
+    left: auto !important;
+    top: auto !important;
+    transform: none !important;
+    pointer-events: auto;
+    z-index: 55;
+}
+
+.strike-round-cluster {
     display: flex;
+    align-items: flex-end;
+    justify-content: flex-end;
+    gap: 14px;
+}
+
+.btn-strike-round,
+.btn-twitch-round {
+    border-radius: 50% !important;
+    display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 10px;
+    text-align: center;
+    cursor: pointer;
+    user-select: none;
+    pointer-events: auto;
+    padding: 4px;
+    transition: transform 0.14s ease, box-shadow 0.16s ease, filter 0.14s ease;
+}
+
+/* Nút Tròn Chính: GIẬT CẦN (98x98px) */
+.btn-strike-round {
+    width: 98px;
+    height: 98px;
+    background: radial-gradient(circle at 35% 30%, #f87171, #dc2626 62%, #991b1b 100%);
+    border: 3px solid rgba(254, 202, 202, 0.92);
+    color: #ffffff;
+    box-shadow:
+        0 0 0 4px rgba(239, 68, 68, 0.22),
+        0 10px 26px rgba(185, 28, 28, 0.62),
+        inset 0 2px 6px rgba(255, 255, 255, 0.35);
+}
+
+.btn-strike-round .rbtn-ico {
+    font-size: 24px;
+    line-height: 1;
+    margin-bottom: 3px;
+}
+
+.btn-strike-round .rbtn-lbl {
+    font-size: 12.5px;
+    font-weight: 900;
+    letter-spacing: 0.3px;
+    line-height: 1.1;
+}
+
+.btn-strike-round .rbtn-sub {
+    font-size: 9.5px;
+    font-weight: 700;
+    opacity: 0.88;
+    margin-top: 2px;
+    background: rgba(0, 0, 0, 0.24);
+    padding: 1px 6px;
+    border-radius: 999px;
+}
+
+/* Nút Tròn Vệ Tinh: KÍCH MỒI (80x80px) */
+.btn-twitch-round {
+    width: 82px;
+    height: 82px;
+    margin-bottom: 6px;
+    background: radial-gradient(circle at 35% 30%, #34d399, #059669 65%, #065f46 100%);
+    border: 2.5px solid #a7f3d0;
+    color: #ffffff;
+    box-shadow:
+        0 0 0 4px rgba(16, 185, 129, 0.2),
+        0 8px 22px rgba(5, 150, 105, 0.52),
+        inset 0 2px 5px rgba(255, 255, 255, 0.32);
+}
+
+.btn-twitch-round .rbtn-ico {
+    font-size: 19px;
+    line-height: 1;
+    margin-bottom: 2px;
+}
+
+.btn-twitch-round .rbtn-lbl {
+    font-size: 10.5px;
+    font-weight: 900;
+    line-height: 1.1;
+}
+
+.btn-twitch-round .rbtn-sub {
+    font-size: 9.5px;
+    font-weight: 800;
+    margin-top: 2px;
+    color: #fef08a;
+    background: rgba(0, 0, 0, 0.28);
+    padding: 1px 6px;
+    border-radius: 999px;
+}
+
+.btn-strike-round:hover,
+.btn-twitch-round:hover {
+    transform: translateY(-3px) scale(1.04);
+    filter: brightness(1.08);
+}
+
+.btn-strike-round:active,
+.btn-twitch-round:active {
+    transform: scale(0.94);
 }
 
 .btn-twitch {
@@ -5584,38 +5697,37 @@ body, html {
 }
 
 .btn-twitch.twitch-waiting,
-.btn-twitch-huge.twitch-waiting {
-    background: linear-gradient(135deg, #d97706, #b45309) !important;
-    border-color: #fde047 !important;
-    color: #fef9c3 !important;
+.btn-twitch-round.twitch-waiting {
+    background: radial-gradient(circle at 35% 30%, #fbbf24, #d97706 68%, #92400e 100%) !important;
+    border-color: #fef08a !important;
+    color: #ffffff !important;
+    box-shadow: 0 0 18px rgba(245, 158, 11, 0.65) !important;
 }
 
-.btn-twitch-huge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 12px 18px;
-    border-radius: 999px;
-    background: linear-gradient(135deg, #0d9488, #059669);
-    border: 2px solid #6ee7b7;
-    color: #ffffff;
-    font-size: 14px;
-    font-weight: 900;
-    cursor: pointer;
-    box-shadow: 0 8px 22px rgba(13, 148, 136, 0.48);
-    transition: transform 0.14s ease, filter 0.14s ease;
-    pointer-events: auto;
-    white-space: nowrap;
-}
-
-.btn-twitch-huge:hover {
-    transform: translateY(-2px);
-    filter: brightness(1.1);
+.btn-twitch-round.twitch-exhausted {
+    background: radial-gradient(circle at 35% 30%, #64748b, #334155 75%, #1e293b 100%) !important;
+    border-color: #94a3b8 !important;
+    opacity: 0.78;
 }
 
 .btn-m-twitch {
     background: linear-gradient(135deg, #0d9488, #059669) !important;
     border-color: #6ee7b7 !important;
+}
+
+@media (max-width: 900px) {
+    .strike-huge-btn-container {
+        bottom: 68px !important;
+        right: 12px !important;
+    }
+    .btn-strike-round {
+        width: 84px;
+        height: 84px;
+    }
+    .btn-twitch-round {
+        width: 70px;
+        height: 70px;
+    }
 }
 
 .pip-float-frame.pip-night-oled {

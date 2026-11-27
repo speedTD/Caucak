@@ -397,12 +397,6 @@ export class UIManager {
                 </div>
             </div>
 
-            <!-- Radar tăm cá nhỏ hơn phía trên bên phải -->
-            <div class="radar-box">
-                <div class="radar-title">📡 MÁY DÒ TĂM CÁ</div>
-                <canvas id="radar-canvas" width="115" height="115"></canvas>
-            </div>
-
             <!-- Gợi ý bến câu khi đi dạo gần bến -->
             <div class="spot-near-banner" id="spot-near-banner" style="display: none;">
                 <div class="spot-near-title" id="spot-near-title">Bến Cầu Gỗ Chính #1</div>
@@ -465,11 +459,19 @@ export class UIManager {
                 <div class="fish-mind-log" id="fish-mind-log">Mặt nước tĩnh lặng</div>
             </div>
 
-            <!-- NÚT GIẬT CẦN & NÚT KÍCH MỒI THƯỜNG TRỰC KHI ĐANG BUÔNG CẦN / CÁ ĂN REALTIME -->
+            <!-- CỤM NÚT HÌNH TRÒN GIẬT CẦN & KÍCH MỒI GÓC DƯỚI PHẢI KHI ĐANG BUÔNG CẦN -->
             <div class="strike-huge-btn-container" id="strike-container" style="display: none;">
-                <div class="strike-inline-bar">
-                    <button class="btn-strike-huge" id="btn-strike-act">⚡ GIẬT CẦN (SPACE / CLICK)</button>
-                    <button class="btn-twitch-huge" id="btn-strike-twitch" title="Nhấc nhử Kích Mồi: 30% cá ăn sau 5s (Bấm 2-3 vạch giữ 3-5s)">🎯 KÍCH MỒI (K)</button>
+                <div class="strike-round-cluster">
+                    <button class="btn-twitch-round" id="btn-strike-twitch" title="Nhấc nhử Kích Mồi: 30% cá ăn sau 5s (Bấm 2-3 vạch giữ 3-5s)">
+                        <span class="rbtn-ico" id="strike-twitch-ico">🎯</span>
+                        <span class="rbtn-lbl" id="strike-twitch-lbl">KÍCH MỒI</span>
+                        <span class="rbtn-sub" id="strike-twitch-sub">K • [10]</span>
+                    </button>
+                    <button class="btn-strike-round" id="btn-strike-act" title="Giật cần đóng cá (Phím Space / Click Chuột Trái)">
+                        <span class="rbtn-ico">⚡</span>
+                        <span class="rbtn-lbl">GIẬT CẦN</span>
+                        <span class="rbtn-sub">SPACE</span>
+                    </button>
                 </div>
             </div>
 
@@ -5201,7 +5203,6 @@ export class UIManager {
     }
 
     update(delta, playerPos) {
-        this.drawRadar(playerPos);
         this.updateFishMindHUD();
         this.updateDevFishInspector(delta, playerPos);
 
@@ -5383,11 +5384,21 @@ export class UIManager {
             }
             const btnStrikeTw = document.getElementById('btn-strike-twitch');
             if (btnStrikeTw) {
-                btnStrikeTw.style.display = (this.gameplay.state === 'FLOAT_WAIT') ? 'inline-flex' : 'none';
-                btnStrikeTw.innerText = isWaiting5s
-                    ? `⏳ Soi 2–3 vạch (${Math.ceil(this.gameplay.twitchBiteCountdown)}s)`
-                    : `🎯 KÍCH MỒI (K) [${twLeft}]`;
+                btnStrikeTw.style.display = (this.gameplay.state === 'FLOAT_WAIT') ? 'flex' : 'none';
+                const twIco = document.getElementById('strike-twitch-ico');
+                const twLbl = document.getElementById('strike-twitch-lbl');
+                const twSub = document.getElementById('strike-twitch-sub');
+                if (isWaiting5s) {
+                    if (twIco) twIco.innerText = '⏳';
+                    if (twLbl) twLbl.innerText = 'SOI PHAO';
+                    if (twSub) twSub.innerText = `${Math.ceil(this.gameplay.twitchBiteCountdown)}s (2–3 vạch)`;
+                } else {
+                    if (twIco) twIco.innerText = '🎯';
+                    if (twLbl) twLbl.innerText = 'KÍCH MỒI';
+                    if (twSub) twSub.innerText = `K • [${twLeft}]`;
+                }
                 btnStrikeTw.classList.toggle('twitch-waiting', isWaiting5s);
+                btnStrikeTw.classList.toggle('twitch-exhausted', !isWaiting5s && twLeft <= 0);
             }
             const btnMTw = document.getElementById('btn-m-twitch');
             if (btnMTw) {
@@ -5412,10 +5423,6 @@ export class UIManager {
 
         if (this.gameplay.state === 'FLOAT_WAIT' || this.gameplay.state === 'BITING') {
             if (strikeContainer) strikeContainer.style.display = 'block';
-            if (btnStrike) {
-                btnStrike.innerHTML = '⚡ GIẬT CẦN <span style="font-size: 11px; opacity: 0.85; margin-left: 4px;">[SPACE / CLICK]</span>';
-                btnStrike.className = 'btn-strike-huge';
-            }
         } else {
             if (strikeContainer) strikeContainer.style.display = 'none';
         }
