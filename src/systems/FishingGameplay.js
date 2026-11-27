@@ -3,6 +3,7 @@ import { soundManager } from '../audio/SoundManager.js';
 import { createRodGripTexture, createCarbonWeaveTexture, createFloatBodyTexture } from '../world/TextureGenerator.js';
 import { BaitMixingSystem } from './BaitMixingSystem.js';
 import { buildRealisticFish } from '../world/FishModelBuilder.js';
+import { createRealisticHumanCharacter } from '../world/HumanCharacterBuilder.js';
 import { SPECIES, inferSpeciesKey } from '../data/FishProfiles.js';
 import { getDefaultEquipmentLevels, computeEquipmentBonuses } from '../data/EquipmentUpgradeData.js';
 import { STARTER_RODS, getCalibrationById, getLineSpec, getDefaultRigState } from '../data/RigSetupData.js';
@@ -53,10 +54,26 @@ export class FishingGameplay {
         this.activeHookBait = null;
         this.activeGroundBait = null;
 
-        // FPV Viewmodel Rig gắn vào Camera
+        // Rig Đạo Cụ Bến Câu & Cần Thủ: Neo tại tọa độ ghế ngồi để khi Camera lùi ra Góc Nhìn Thứ 3 khi bo cá, Thùng/Khay/Ô/Cần vẫn bám chuẩn trên sàn bến!
         this.fpvRig = new THREE.Group();
-        this.camera.add(this.fpvRig);
+        this.scene.add(this.fpvRig);
         this.scene.add(this.camera);
+
+        // Trạng thái Camera Góc Nhìn Thứ 3 Động (Third-Person Fighting Camera) & Mỏ neo ghế ngồi chuẩn
+        this.tpvBlend = 0.0;
+        this.hasSeatAnchor = false;
+        this.seatEyePos = new THREE.Vector3(0, 1.25, 0);
+        this.seatBaseQuat = new THREE.Quaternion();
+        this.seatLevelQuat = new THREE.Quaternion();
+        this.seatForward = new THREE.Vector3(0, 0, -1);
+        this.seatRight = new THREE.Vector3(1, 0, 0);
+        this.tpvCamPos = new THREE.Vector3();
+        this.tpvLookTarget = new THREE.Vector3();
+        this.smoothedTpvCamPos = new THREE.Vector3();
+        this.smoothedTpvLook = new THREE.Vector3();
+        this.tpvCamInitialized = false;
+        this.lastJumpArcY = 0;
+        this.hardRunScreamCooldown = 0;
 
         // Camera phụ Picture-in-Picture (PiP) Zoom cận cảnh Phao Đài thời gian thực
         this.pipCamera = new THREE.PerspectiveCamera(15, 1.0, 0.1, 120);
@@ -73,13 +90,17 @@ export class FishingGameplay {
         this.baitTray = null;
         this.rodRestSupport = null;
         this.landingNetGroup = null;
+        this.fpvArmGroup = null;
+        this.tpvAnglerGroup = null;
+        this.rodFrontGripAnchor = null;
+        this.rodButtGripAnchor = null;
 
-        // Vị trí và Tỷ lệ Cần Câu khi Ngồi thường vs Bo Cá Toàn Cảnh (Dynamic Full-Rod Fighting Cam)
+        // Vị trí và Tỷ lệ Cần Câu khi Ngồi thường (FPV) vs Đứng Bo Cá Góc Nhìn Thứ 3 (TPV Action Cam)
         this.baseRodPos = new THREE.Vector3(0.24, -0.29, -0.38);
-        this.fightRodPos = new THREE.Vector3(0.30, -0.44, -0.76);
+        this.fightRodPos = new THREE.Vector3(0.05, 0.10, -0.16);
         this.currentRodPos = new THREE.Vector3(0.24, -0.29, -0.38);
         this.normalFov = 68;
-        this.fightFov = 78;
+        this.fightFov = 64;
         this.rodCurrentScale = 1.0;
 
         // Trạng thái Vật Lý Uốn Lóng Cần & Xung Lực Đóng Cá (Spring-Damper + Strike Whip Impulse)
@@ -1114,10 +1135,99 @@ export class FishingGameplay {
         addConnectedSegment(pSleeveStart, pCuffEnd, 0.028, 0.030, cuffMat, false);
         addConnectedSegment(pCuffEnd, pElbow, 0.030, 0.044, sleeveMat, true);
 
+        this.fpvArmGroup = armGroup;
         this.rodRootGroup.add(armGroup);
 
+        // 2 Điểm neo bàn tay chuẩn xác dọc cán cần để Nhân Vật Cần Thủ 3D (TPV) nắm khớp 2 tay vào đúng cán EVA & đối trọng gốc cần!
+        this.rodFrontGripAnchor = new THREE.Object3D();
+        this.rodFrontGripAnchor.position.set(0, 0.30, 0);
+        this.rodRootGroup.add(this.rodFrontGripAnchor);
+
+        this.rodButtGripAnchor = new THREE.Object3D();
+        this.rodButtGripAnchor.position.set(0, 0.055, 0);
+        this.rodRootGroup.add(this.rodButtGripAnchor);
+
         this.fpvRig.add(this.rodRootGroup);
+
+        // NHÂN VẬT CẦN THỦ 3D TOÀN THÂN (HIỆN LÊN KHI CAMERA CHUYỂN RA GÓC NHÌN THỨ 3 BO CÁ)
+        this.tpvAnglerGroup = createRealisticHumanCharacter({
+            pose: 'STANDING',
+            shirtColor: 0x0284c7,
+            sleeveColor: 0xf1f5f9,
+            vestColor: 0x0f172a,
+            pantsColor: 0x1e293b,
+            hatColor: 0x0f172a,
+            hatType: 'CAP',
+            wearGlasses: true,
+            hasVest: true
+        });
+        this.tpvAnglerGroup.visible = false;
+        this.tpvAnglerGroup.scale.setScalar(0.98);
+        this.tpvAnglerGroup.position.set(0.02, -0.86, -0.02);
+        this.tpvAnglerGroup.rotation.y = Math.PI;
+        this.fpvRig.add(this.tpvAnglerGroup);
+
         this.applyArticulatedRodPose(1.0);
+    }
+
+    // Đồng bộ tọa độ mắt & hướng nhìn chuẩn của ghế ngồi từ Camera (trước khi dịch Camera ra góc nhìn thứ 3)
+    syncSeatAnchorFromCamera() {
+        this.seatEyePos.copy(this.camera.position);
+        this.seatBaseQuat.copy(this.camera.quaternion);
+        this.camera.getWorldDirection(this.seatForward);
+        this.seatForward.y = 0;
+        if (this.seatForward.lengthSq() < 0.0001) {
+            this.seatForward.set(0, 0, -1);
+        } else {
+            this.seatForward.normalize();
+        }
+        this.seatRight.set(-this.seatForward.z, 0, this.seatForward.x);
+        const flatYaw = Math.atan2(-this.seatForward.x, -this.seatForward.z);
+        this.seatLevelQuat.setFromAxisAngle(new THREE.Vector3(0, 1, 0), flatYaw);
+        this.hasSeatAnchor = true;
+    }
+
+    // Giải động học ngược 2 khớp xương tay (2-Bone Analytical IK) giúp 2 bàn tay cần thủ luôn ôm khít cán cần câu 3D!
+    solveTwoBoneArmIK(arm, upperBody, targetWorldPos, poleLocalDir) {
+        if (!arm || !upperBody || !targetWorldPos) return;
+        const L1 = 0.26;
+        const L2 = 0.255;
+        const pShoulder = arm.shoulderPivot.position;
+        const pTarget = upperBody.worldToLocal(targetWorldPos.clone());
+        const toTarget = pTarget.sub(pShoulder);
+        const rawDist = toTarget.length();
+        if (rawDist < 0.04) return;
+
+        const d = THREE.MathUtils.clamp(rawDist, 0.12, L1 + L2 - 0.004);
+        const dir = toTarget.normalize();
+
+        const cosShoulder = THREE.MathUtils.clamp((L1 * L1 + d * d - L2 * L2) / (2 * L1 * d), -1, 1);
+        const sinShoulder = Math.sqrt(Math.max(0, 1 - cosShoulder * cosShoulder));
+        const cosElbow = THREE.MathUtils.clamp((L1 * L1 + L2 * L2 - d * d) / (2 * L1 * L2), -1, 1);
+        const elbowBend = Math.PI - Math.acos(cosElbow);
+
+        // Vector hướng khuỷu tay (hạ tự nhiên xuống dưới & mở nhẹ sang hai bên sườn)
+        const perp = poleLocalDir.clone().addScaledVector(dir, -poleLocalDir.dot(dir));
+        if (perp.lengthSq() < 0.0001) {
+            perp.set(0, -1, 0).addScaledVector(dir, -dir.y);
+        }
+        perp.normalize();
+
+        const upperArmDir = dir.clone().multiplyScalar(cosShoulder).addScaledVector(perp, sinShoulder).normalize();
+        const elbowLocalPos = upperArmDir.clone().multiplyScalar(L1);
+        const forearmDir = dir.clone().multiplyScalar(d).sub(elbowLocalPos).normalize();
+
+        const xAxis = forearmDir.clone().cross(upperArmDir);
+        if (xAxis.lengthSq() < 0.00001) {
+            xAxis.copy(perp).cross(upperArmDir);
+        }
+        xAxis.normalize();
+        const yAxis = upperArmDir.clone().negate();
+        const zAxis = xAxis.clone().cross(yAxis).normalize();
+
+        const rotMat = new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis);
+        arm.shoulderPivot.quaternion.setFromRotationMatrix(rotMat);
+        arm.elbowPivot.rotation.set(-elbowBend, 0, 0);
     }
 
     // CẬP NHẬT ĐƯỜNG CONG PARABOL & VẬT LÝ GIẬT CẦN / NGHIÊNG TRÁI PHẢI BO CÁ (CONTINUOUS SMOOTH CURVED ROD PHYSICS)
@@ -1242,9 +1352,9 @@ export class FishingGameplay {
             }
         }
 
-        // Chuyển đổi mượt mà Vị Trí Gốc Cần, Tỷ Lệ Scale và Camera FOV giữa Ngồi thường vs Bo Cá Toàn Cảnh
+        // Chuyển đổi mượt mà Vị Trí Gốc Cần, Tỷ Lệ Scale và Camera FOV giữa Ngồi thường vs Bo Cá Góc Nhìn Thứ 3
         const isFightingMode = (this.state === FISHING_STATES.FIGHTING && this.hookedFish);
-        const targetScale = isFightingMode ? 0.80 : 1.0;
+        const targetScale = isFightingMode ? 0.94 : 1.0;
         const baseTargetPos = isFightingMode ? this.fightRodPos : this.baseRodPos;
         const targetFov = isFightingMode ? this.fightFov : this.normalFov;
 
@@ -2114,58 +2224,194 @@ export class FishingGameplay {
         this.waterEntrySpray.visible = false;
         this.scene.add(this.waterEntrySpray);
 
-        // VỆT SÓNG CHỮ V ĐA TẦNG CÁ CHẠY RẼ NƯỚC & ĐỘNG NƯỚC SỤC BÙN (3D MULTI-LAYER V-WAKE & MUD BOIL)
+        // ==================== TEXTURE BỌT NƯỚC THỦY ĐỘNG LỰC HỌC MỀM MẠI (KHÔNG VIỀN CỨNG) ====================
+        const makeWakeStreakTex = () => {
+            const c = document.createElement('canvas');
+            c.width = 128;
+            c.height = 256;
+            const ctx = c.getContext('2d');
+            ctx.clearRect(0, 0, 128, 256);
+            // Đáy ảnh (y=255, v=0) tương ứng ĐẦU MŨI SÓNG (+Z), Đỉnh ảnh (y=0, v=1) tương ứng ĐUÔI SÓNG TAN DẦN (-Z)
+            for (let y = 0; y < 256; y++) {
+                const tFromNose = 1.0 - (y / 255); // 0 ở mũi -> 1 ở đuôi
+                const longAlpha = Math.sin(Math.min(1, tFromNose * 5.2) * Math.PI * 0.5) * Math.pow(1.0 - tFromNose, 1.35);
+                const halfW = 18 + tFromNose * 38;
+                const grad = ctx.createLinearGradient(64 - halfW, y, 64 + halfW, y);
+                grad.addColorStop(0.0, 'rgba(224, 242, 254, 0)');
+                grad.addColorStop(0.28, `rgba(186, 230, 253, ${(longAlpha * 0.52).toFixed(3)})`);
+                grad.addColorStop(0.50, `rgba(255, 255, 255, ${(longAlpha * 0.96).toFixed(3)})`);
+                grad.addColorStop(0.72, `rgba(186, 230, 253, ${(longAlpha * 0.52).toFixed(3)})`);
+                grad.addColorStop(1.0, 'rgba(224, 242, 254, 0)');
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, y, 128, 1);
+            }
+            const tex = new THREE.CanvasTexture(c);
+            tex.needsUpdate = true;
+            return tex;
+        };
+
+        const makeSoftFoamPatchTex = () => {
+            const c = document.createElement('canvas');
+            c.width = 128;
+            c.height = 128;
+            const ctx = c.getContext('2d');
+            const rg = ctx.createRadialGradient(64, 64, 4, 64, 64, 60);
+            rg.addColorStop(0.0, 'rgba(255, 255, 255, 0.92)');
+            rg.addColorStop(0.38, 'rgba(224, 242, 254, 0.65)');
+            rg.addColorStop(0.72, 'rgba(186, 230, 253, 0.24)');
+            rg.addColorStop(1.0, 'rgba(186, 230, 253, 0.0)');
+            ctx.fillStyle = rg;
+            ctx.fillRect(0, 0, 128, 128);
+            // Các hạt bọt khí li ti sủi trong vệt rẽ nước
+            for (let i = 0; i < 36; i++) {
+                const a = (i * 2.39996);
+                const r = 6 + (i / 36) * 44;
+                const bx = 64 + Math.cos(a) * r;
+                const by = 64 + Math.sin(a) * r;
+                ctx.fillStyle = `rgba(255,255,255,${(0.55 * (1 - r / 56)).toFixed(2)})`;
+                ctx.beginPath();
+                ctx.arc(bx, by, 1.4 + (i % 3) * 0.9, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            const tex = new THREE.CanvasTexture(c);
+            tex.needsUpdate = true;
+            return tex;
+        };
+
+        const makeRoosterSprayTex = () => {
+            const c = document.createElement('canvas');
+            c.width = 128;
+            c.height = 128;
+            const ctx = c.getContext('2d');
+            // Đáy ảnh (y=127) sát mặt nước trắng đục, vọt chéo lên trên tan thành sương nước
+            const lg = ctx.createLinearGradient(64, 127, 64, 8);
+            lg.addColorStop(0.0, 'rgba(255, 255, 255, 0.95)');
+            lg.addColorStop(0.45, 'rgba(224, 242, 254, 0.62)');
+            lg.addColorStop(1.0, 'rgba(224, 242, 254, 0.0)');
+            ctx.fillStyle = lg;
+            ctx.beginPath();
+            ctx.moveTo(54, 127);
+            ctx.quadraticCurveTo(36, 52, 8, 10);
+            ctx.quadraticCurveTo(64, 26, 92, 54);
+            ctx.quadraticCurveTo(84, 96, 74, 127);
+            ctx.closePath();
+            ctx.fill();
+            const tex = new THREE.CanvasTexture(c);
+            tex.needsUpdate = true;
+            return tex;
+        };
+
+        const wakeStreakTex = makeWakeStreakTex();
+        const softFoamTex = makeSoftFoamPatchTex();
+        const roosterSprayTex = makeRoosterSprayTex();
+
+        this.waterEntrySpray.material.map = softFoamTex;
+        this.waterEntrySpray.material.depthWrite = false;
+
+        // VỆT SÓNG KELVIN CHỮ V ĐA TẦNG CÁ CHẠY RẼ NƯỚC CHUẨN THỦY ĐỘNG LỰC HỌC (KELVIN V-WAKE & BOW WAVE)
         this.vWakeGroup = new THREE.Group();
         this.vWakeGroup.visible = false;
-        const wakeMat = new THREE.MeshBasicMaterial({
+        const wakeOuterMat = new THREE.MeshBasicMaterial({
+            map: wakeStreakTex,
             color: 0xe0f2fe,
-            transparent: true,
-            opacity: 0.78,
-            side: THREE.DoubleSide,
-            depthWrite: false
-        });
-        const foamTrailMat = new THREE.MeshBasicMaterial({
-            color: 0xffffff,
             transparent: true,
             opacity: 0.88,
             side: THREE.DoubleSide,
             depthWrite: false
         });
+        const wakeInnerFoamMat = new THREE.MeshBasicMaterial({
+            map: wakeStreakTex,
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0.95,
+            side: THREE.DoubleSide,
+            depthWrite: false
+        });
 
-        const leftWakeWing = new THREE.Mesh(new THREE.PlaneGeometry(0.20, 1.65), wakeMat);
+        // 2 Cánh sóng Kelvin ngoài (mở góc V chuẩn xác loe rộng về phía sau đuôi cá: Left zRot=+0.42, Right zRot=-0.42)
+        const leftWakeWing = new THREE.Mesh(new THREE.PlaneGeometry(0.38, 1.85), wakeOuterMat);
         leftWakeWing.rotation.x = -Math.PI / 2;
-        leftWakeWing.rotation.z = -0.38;
-        leftWakeWing.position.set(-0.32, 0.022, -0.62);
+        leftWakeWing.rotation.z = 0.42;
+        leftWakeWing.position.set(-0.37, 0.019, -0.76);
         this.vWakeGroup.add(leftWakeWing);
 
-        const rightWakeWing = new THREE.Mesh(new THREE.PlaneGeometry(0.20, 1.65), wakeMat);
+        const rightWakeWing = new THREE.Mesh(new THREE.PlaneGeometry(0.38, 1.85), wakeOuterMat);
         rightWakeWing.rotation.x = -Math.PI / 2;
-        rightWakeWing.rotation.z = 0.38;
-        rightWakeWing.position.set(0.32, 0.022, -0.62);
+        rightWakeWing.rotation.z = -0.42;
+        rightWakeWing.position.set(0.37, 0.019, -0.76);
         this.vWakeGroup.add(rightWakeWing);
 
-        // Vệt bọt trắng sủi kéo đuôi ngay sau lưng cá
-        const centerFoamSpine = new THREE.Mesh(new THREE.PlaneGeometry(0.18, 1.25), foamTrailMat);
+        // 2 Dải bọt sủi tốc độ cao lớp trong (góc hẹp ±0.22 rad)
+        const leftInnerWake = new THREE.Mesh(new THREE.PlaneGeometry(0.24, 1.35), wakeInnerFoamMat);
+        leftInnerWake.rotation.x = -Math.PI / 2;
+        leftInnerWake.rotation.z = 0.22;
+        leftInnerWake.position.set(-0.15, 0.023, -0.58);
+        this.vWakeGroup.add(leftInnerWake);
+
+        const rightInnerWake = new THREE.Mesh(new THREE.PlaneGeometry(0.24, 1.35), wakeInnerFoamMat);
+        rightInnerWake.rotation.x = -Math.PI / 2;
+        rightInnerWake.rotation.z = -0.22;
+        rightInnerWake.position.set(0.15, 0.023, -0.58);
+        this.vWakeGroup.add(rightInnerWake);
+
+        // Dải bọt xoáy trục giữa do vây đuôi cá quạt nước đẩy đi
+        const centerFoamSpine = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 1.45), wakeInnerFoamMat);
         centerFoamSpine.rotation.x = -Math.PI / 2;
-        centerFoamSpine.position.set(0, 0.026, -0.58);
+        centerFoamSpine.position.set(0, 0.025, -0.64);
         this.vWakeGroup.add(centerFoamSpine);
 
+        // Gờ sóng mũi uốn cong hình bán nguyệt (3D Raised Bow Wave Crest) đội nước vồng lên trước đầu cá!
+        const bowArcGeo = new THREE.CylinderGeometry(0.20, 0.28, 0.085, 16, 1, true, -Math.PI * 0.42, Math.PI * 0.84);
         const bowCrest = new THREE.Mesh(
-            new THREE.ConeGeometry(0.21, 0.36, 12, 1, true),
-            foamTrailMat
+            bowArcGeo,
+            new THREE.MeshBasicMaterial({
+                map: softFoamTex,
+                color: 0xffffff,
+                transparent: true,
+                opacity: 0.90,
+                side: THREE.DoubleSide,
+                depthWrite: false
+            })
         );
-        bowCrest.position.set(0, 0.07, 0.10);
-        bowCrest.rotation.x = -0.48;
+        bowCrest.position.set(0, 0.036, 0.02);
         this.vWakeGroup.add(bowCrest);
+        this.bowCrestMesh = bowCrest;
         this.scene.add(this.vWakeGroup);
+
+        // DẢI BỌT TRẮNG LƯU DẤU QUỸ ĐẠO CÁ CHẠY TRÊN MẶT HỒ (PERSISTENT CURVED FOAM WAKE TRAIL — 24 NODES)
+        this.wakeTrailNodes = [];
+        this.wakeTrailSpawnDist = 0;
+        this.lastTrailSpawnPos = new THREE.Vector3();
+        const trailGeo = new THREE.PlaneGeometry(0.46, 0.62);
+        for (let i = 0; i < 24; i++) {
+            const tMat = new THREE.MeshBasicMaterial({
+                map: softFoamTex,
+                color: 0xf0f9ff,
+                transparent: true,
+                opacity: 0.0,
+                depthWrite: false
+            });
+            const tMesh = new THREE.Mesh(trailGeo, tMat);
+            tMesh.rotation.x = -Math.PI / 2;
+            tMesh.visible = false;
+            this.scene.add(tMesh);
+            this.wakeTrailNodes.push({
+                mesh: tMesh,
+                mat: tMat,
+                life: 0,
+                maxLife: 1.35,
+                baseScale: 1.0
+            });
+        }
 
         // QUẦNG NƯỚC XOÁY & BÙN CUỘN TỪ ĐÁY LÊN KHI CÁ TO ĐỘNG NƯỚC QUẪY ĐUÔI
         this.fishMudBoil = new THREE.Mesh(
-            new THREE.CircleGeometry(0.42, 24),
+            new THREE.PlaneGeometry(0.95, 0.95),
             new THREE.MeshBasicMaterial({
-                color: 0x3f2e1e,
+                map: softFoamTex,
+                color: 0x4a3520,
                 transparent: true,
-                opacity: 0.36,
+                opacity: 0.42,
                 depthWrite: false
             })
         );
@@ -2174,35 +2420,58 @@ export class FishingGameplay {
         this.fishMudBoil.visible = false;
         this.scene.add(this.fishMudBoil);
 
-        // VỆT SÓNG TRẮNG TẠI ĐIỂM DÂY CƯỚC XÉ NGANG MẶT HỒ (3D LINE WATER-SLICE WAKE)
+        // VỆT SÓNG TRẮNG & LƯỠI NƯỚC BẮN VỌT LÊN TẠI ĐIỂM DÂY CƯỚC XÉ NGANG MẶT HỒ (3D LINE-SLICE & ROOSTER TAIL)
         this.lineCutWakeGroup = new THREE.Group();
         this.lineCutWakeGroup.visible = false;
         const cutFoamMat = new THREE.MeshBasicMaterial({
+            map: wakeStreakTex,
             color: 0xffffff,
             transparent: true,
-            opacity: 0.90,
+            opacity: 0.94,
             side: THREE.DoubleSide,
             depthWrite: false
         });
-        const cutLeft = new THREE.Mesh(new THREE.PlaneGeometry(0.055, 0.62), cutFoamMat);
+        const cutLeft = new THREE.Mesh(new THREE.PlaneGeometry(0.14, 0.72), cutFoamMat);
         cutLeft.rotation.x = -Math.PI / 2;
-        cutLeft.rotation.z = -0.26;
-        cutLeft.position.set(-0.08, 0.018, -0.26);
+        cutLeft.rotation.z = 0.30;
+        cutLeft.position.set(-0.10, 0.018, -0.30);
         this.lineCutWakeGroup.add(cutLeft);
 
-        const cutRight = new THREE.Mesh(new THREE.PlaneGeometry(0.055, 0.62), cutFoamMat);
+        const cutRight = new THREE.Mesh(new THREE.PlaneGeometry(0.14, 0.72), cutFoamMat);
         cutRight.rotation.x = -Math.PI / 2;
-        cutRight.rotation.z = 0.26;
-        cutRight.position.set(0.08, 0.018, -0.26);
+        cutRight.rotation.z = -0.30;
+        cutRight.position.set(0.10, 0.018, -0.30);
         this.lineCutWakeGroup.add(cutRight);
 
         const cutBead = new THREE.Mesh(
-            new THREE.RingGeometry(0.012, 0.065, 18),
-            cutFoamMat
+            new THREE.PlaneGeometry(0.18, 0.18),
+            new THREE.MeshBasicMaterial({
+                map: softFoamTex,
+                color: 0xffffff,
+                transparent: true,
+                opacity: 0.95,
+                depthWrite: false
+            })
         );
         cutBead.rotation.x = -Math.PI / 2;
-        cutBead.position.set(0, 0.020, 0);
+        cutBead.position.set(0, 0.021, 0.02);
         this.lineCutWakeGroup.add(cutBead);
+
+        // Lưỡi nước dựng đứng (Rooster-Tail Fin) bắn vọt ngược chiều dây cước xé mặt hồ!
+        this.lineRoosterTail = new THREE.Mesh(
+            new THREE.PlaneGeometry(0.32, 0.28),
+            new THREE.MeshBasicMaterial({
+                map: roosterSprayTex,
+                color: 0xffffff,
+                transparent: true,
+                opacity: 0.88,
+                side: THREE.DoubleSide,
+                depthWrite: false
+            })
+        );
+        this.lineRoosterTail.rotation.y = Math.PI / 2; // Đặt dọc theo mặt phẳng YZ (hướng ngược chiều cắt -Z)
+        this.lineRoosterTail.position.set(0, 0.13, -0.11);
+        this.lineCutWakeGroup.add(this.lineRoosterTail);
         this.scene.add(this.lineCutWakeGroup);
 
         // HỆ THỐNG 48 HẠT NƯỚC BẮN TUNG TÓE KHI CƯỚC XÉ NƯỚC, CÁ QUẪY ĐUÔI & NHẢY SANTO
@@ -2245,6 +2514,10 @@ export class FishingGameplay {
         handle.rotation.x = THREE.MathUtils.degToRad(-78);
         handle.position.set(-0.22, -0.34, -1.25);
         this.landingNetGroup.add(handle);
+
+        this.landingNetGripAnchor = new THREE.Object3D();
+        this.landingNetGripAnchor.position.set(-0.22, 0.02, -0.14);
+        this.landingNetGroup.add(this.landingNetGripAnchor);
 
         const ySpreader = new THREE.Mesh(
             new THREE.CylinderGeometry(0.016, 0.014, 0.08, 12),
@@ -2298,6 +2571,14 @@ export class FishingGameplay {
         this.state = FISHING_STATES.SEATED;
 
         this.fpvRig.visible = true;
+        this.tpvBlend = 0;
+        this.tpvCamInitialized = false;
+        this.syncSeatAnchorFromCamera();
+        this.fpvRig.position.copy(this.seatEyePos);
+        this.fpvRig.quaternion.copy(this.seatBaseQuat);
+        if (this.fpvArmGroup) this.fpvArmGroup.visible = true;
+        if (this.tpvAnglerGroup) this.tpvAnglerGroup.visible = false;
+        if (this.umbrellaGroup) this.umbrellaGroup.position.set(0, 0, 0);
         this.rodRestSupport.visible = true;
         this.landingNetGroup.visible = false;
         this.fish3DGroup.visible = false;
@@ -2331,6 +2612,12 @@ export class FishingGameplay {
         this.updateFloatLedGlow(false);
         this.bubbleSystem.clearHookBaitTarget();
         this.state = FISHING_STATES.ROAM;
+        this.tpvBlend = 0;
+        this.tpvCamInitialized = false;
+        this.hasSeatAnchor = false;
+        if (this.fpvArmGroup) this.fpvArmGroup.visible = true;
+        if (this.tpvAnglerGroup) this.tpvAnglerGroup.visible = false;
+        if (this.umbrellaGroup) this.umbrellaGroup.position.set(0, 0, 0);
         this.fpvRig.visible = false;
         this.floatGroup.visible = false;
         if (this.floatMeniscusRing) this.floatMeniscusRing.visible = false;
@@ -2719,15 +3006,20 @@ export class FishingGameplay {
         this.waterEntrySpray.visible = false;
 
         const forward = new THREE.Vector3();
-        this.camera.getWorldDirection(forward);
-        forward.y = 0;
-        forward.normalize();
+        if (this.hasSeatAnchor) {
+            forward.copy(this.seatForward);
+        } else {
+            this.camera.getWorldDirection(forward);
+            forward.y = 0;
+            forward.normalize();
+        }
+        const originPos = this.hasSeatAnchor ? this.seatEyePos : this.camera.position;
 
         const castDist = this.getCastDistance();
         this.floatTargetPos.set(
-            this.camera.position.x + forward.x * castDist,
+            originPos.x + forward.x * castDist,
             0.0,
-            this.camera.position.z + forward.z * castDist
+            originPos.z + forward.z * castDist
         );
 
         // Điểm xuất phát từ đọt cần khi vung bổ mồi
@@ -3279,6 +3571,15 @@ export class FishingGameplay {
         if (this.lineCutWakeGroup) this.lineCutWakeGroup.visible = true;
         if (this.fishMudBoil) this.fishMudBoil.visible = (finalWeight >= 2.5);
         this.lastLineCutPos.copy(this.floatTargetPos);
+        this.lastTrailSpawnPos.copy(this.floatTargetPos);
+        this.wakeTrailSpawnDist = 0;
+        this.hardRunScreamCooldown = 1.6;
+
+        // Tiếng cước rít gió bùng lên ngay cú bứt tốc đầu tiên khi cá dính lưỡi phóng đi!
+        if (soundManager.playHardRunScream && (finalWeight >= 1.8 || isFoulHooked)) {
+            const firstSurge = THREE.MathUtils.clamp(0.45 + (finalWeight / 12.0) * 0.55 + (isFoulHooked ? 0.25 : 0), 0.45, 1.25);
+            soundManager.playHardRunScream(firstSurge, finalWeight);
+        }
 
         const fScale = THREE.MathUtils.clamp(0.7 + this.hookedFish.weight / 14.0, 0.8, 1.75);
         this.fish3DGroup.scale.set(fScale, fScale, fScale);
@@ -3290,6 +3591,12 @@ export class FishingGameplay {
         if (this.fishMudBoil) this.fishMudBoil.visible = false;
         if (this.vWakeGroup) this.vWakeGroup.visible = false;
         if (this.waterEntrySpray) this.waterEntrySpray.visible = false;
+        if (this.wakeTrailNodes) {
+            this.wakeTrailNodes.forEach(tn => {
+                tn.life = 0;
+                tn.mesh.visible = false;
+            });
+        }
         if (!this.waterSprayDrops) return;
         this.waterSprayDrops.forEach(d => {
             d.life = 0;
@@ -3429,6 +3736,9 @@ export class FishingGameplay {
             this.underPierHold = 0;
             this.phaseGraceTimer = 0.6;
             soundManager.playLineSing(0.95, true);
+            if (soundManager.playHardRunScream && this.hookedFish) {
+                soundManager.playHardRunScream(1.05, this.hookedFish.weight || 4.0);
+            }
             window.dispatchEvent(new CustomEvent('real_life_scenario', {
                 detail: {
                     title: '⚠️ NGUY HIỂM: CÁ LAO VÀO KHU VỰC CHÂN ĐỨNG / GẦM CẦU!',
@@ -3446,6 +3756,10 @@ export class FishingGameplay {
         this.phaseGraceTimer = 1.8;
 
         soundManager.playWaterSplash(0.85);
+        if (soundManager.playHardRunScream && this.hookedFish) {
+            const surge = THREE.MathUtils.clamp(0.55 + (this.hookedFish.fightPower || 0.5) * 0.55, 0.5, 1.2);
+            soundManager.playHardRunScream(surge, this.hookedFish.weight || 3.5);
+        }
         this.bendVelocity += 1.4;
     }
 
@@ -3462,6 +3776,7 @@ export class FishingGameplay {
         if (this.state !== FISHING_STATES.FIGHTING || !this.hookedFish) return null;
         if (this.isNettingAnim) return { finished: false };
 
+        this.syncSeatAnchorFromCamera();
         this.fightElapsedTime = (this.fightElapsedTime || 0) + delta;
         const wNorm = this.fightWeightNorm || 0;
 
@@ -3546,6 +3861,9 @@ export class FishingGameplay {
                 };
 
                 soundManager.playLineSing(1.0, true);
+                if (soundManager.playHardRunScream && this.hookedFish) {
+                    soundManager.playHardRunScream(1.30, this.hookedFish.weight || 5.0);
+                }
                 soundManager.playWaterSplash(1.35);
                 this.bendVelocity += 3.8;
 
@@ -3942,14 +4260,29 @@ export class FishingGameplay {
             this.lineTension,
             runIntensity + Math.abs(this.forceBalance) * 0.25,
             this.hookedFish ? this.hookedFish.weight : 3.0,
-            soundPhase
+            soundPhase,
+            this.lineCutSpeed || 0
         );
 
         // Tiếng cước xé mặt nước ("xèèè") liên tục đồng bộ với tốc độ cá chạy rẽ nước & độ căng cước
         if (soundManager.updateWaterCutLoop) {
-            const cutNorm = THREE.MathUtils.clamp((this.lineCutSpeed / 3.2) + (isFastRun ? 0.35 : 0.08), 0, 1);
+            const cutNorm = THREE.MathUtils.clamp((this.lineCutSpeed / 2.6) + (isFastRun ? 0.35 : 0.08), 0, 1);
             const splashy = this.isSantoJumping ? 1.0 : (this.headShakeImpulse * 0.6 + this.lineTension * 0.35);
             soundManager.updateWaterCutLoop(cutNorm, splashy);
+        }
+
+        // Bùng tiếng cước rít gió cao vút ("VÚÚÚT... ZÍÍÍTTT!") mỗi khi cá bứt tốc chạy rẽ nước nhanh hoặc kéo căng cước
+        this.hardRunScreamCooldown = Math.max(0, (this.hardRunScreamCooldown || 0) - delta);
+        if (
+            this.hardRunScreamCooldown <= 0 &&
+            soundManager.playHardRunScream &&
+            isFastRun &&
+            (this.lineCutSpeed > 1.35 || (this.lineTension > 0.74 && !isCounteringCorrectly))
+        ) {
+            const w = this.hookedFish ? (this.hookedFish.weight || 3.5) : 3.5;
+            const burstInt = THREE.MathUtils.clamp(0.55 + (this.lineCutSpeed / 3.2) * 0.5 + this.lineTension * 0.3, 0.55, 1.35);
+            soundManager.playHardRunScream(burstInt, w);
+            this.hardRunScreamCooldown = 2.35 + Math.random() * 0.95;
         }
 
         // Thêm tiếng rít xé nước đột ngột khi cá phi cực gắt hoặc mất cân bằng cước căng > 70%
@@ -4051,14 +4384,22 @@ export class FishingGameplay {
     updateFish3DPosition(delta) {
         if (!this.fish3DGroup) return;
 
+        // Neo tọa độ cá theo đúng hướng ghế ngồi bến câu (không bị trôi khi Camera lùi ra góc nhìn thứ 3!)
         const forward = new THREE.Vector3();
-        this.camera.getWorldDirection(forward);
-        forward.y = 0;
-        forward.normalize();
-        const right = new THREE.Vector3(-forward.z, 0, forward.x);
+        const right = new THREE.Vector3();
+        if (this.hasSeatAnchor) {
+            forward.copy(this.seatForward);
+            right.copy(this.seatRight);
+        } else {
+            this.camera.getWorldDirection(forward);
+            forward.y = 0;
+            forward.normalize();
+            right.set(-forward.z, 0, forward.x);
+        }
+        const seatOrigin = this.hasSeatAnchor ? this.seatEyePos : this.camera.position;
 
         const fishWorldPos = new THREE.Vector3()
-            .copy(this.camera.position)
+            .copy(seatOrigin)
             .addScaledVector(forward, this.fishDistance)
             .addScaledVector(right, this.fishLateralX);
 
@@ -4104,6 +4445,8 @@ export class FishingGameplay {
             }
         }
 
+        this.lastJumpArcY = jumpArcY;
+
         // Độ sâu chân thực: Khi cá còn khỏe cá ghì sâu dưới nước (-0.20m..-0.09m) tạo xoáy động nước, khi mệt mới nổi dần lên mặt hồ
         const submergeByStamina = -0.20 + (1.0 - this.fishStamina) * 0.12;
         const depthY = this.isSantoJumping
@@ -4114,44 +4457,101 @@ export class FishingGameplay {
         // Tính vector vận tốc chạy rẽ nước để xoay vệt sóng chữ V (V-Wake)
         const moveDx = fishWorldPos.x - this.lastFishWorldPos.x;
         const moveDz = fishWorldPos.z - this.lastFishWorldPos.z;
-        const moveSpeed = Math.hypot(moveDx, moveDz) / Math.max(0.001, delta);
+        const stepDist = Math.hypot(moveDx, moveDz);
+        const moveSpeed = stepDist / Math.max(0.001, delta);
         this.lastFishWorldPos.copy(fishWorldPos);
 
         this.fish3DGroup.position.copy(fishWorldPos);
         this.fish3DGroup.visible = true;
 
+        const fishW = this.hookedFish ? (this.hookedFish.weight || 3.0) : 3.0;
+        const weightWakeMul = THREE.MathUtils.clamp(0.82 + (fishW / 14.0) * 0.68, 0.82, 1.55);
+
         if (this.waterEntrySpray) {
             this.waterEntrySpray.position.set(fishWorldPos.x, 0.020, fishWorldPos.z);
-            const s = (this.isSantoJumping ? 1.55 : (0.85 + Math.min(0.65, moveSpeed * 0.22))) + Math.sin(performance.now() * 0.032) * 0.24;
+            const s = (this.isSantoJumping ? 1.65 : (0.90 + Math.min(0.85, moveSpeed * 0.26))) * weightWakeMul + Math.sin(performance.now() * 0.032) * 0.18;
             this.waterEntrySpray.scale.set(s, s, 1);
             this.waterEntrySpray.visible = true;
         }
 
         // Quầng bùn & nước cuộn sục lên từ đáy hồ khi chép cụ / trắm đen quẫy mạnh
         if (this.fishMudBoil) {
-            const showBoil = !this.isSantoJumping && this.hookedFish && this.hookedFish.weight >= 2.5 && this.fightPhase !== FIGHT_PHASES.TAP_TO_NET;
+            const showBoil = !this.isSantoJumping && this.hookedFish && this.hookedFish.weight >= 2.2 && this.fightPhase !== FIGHT_PHASES.TAP_TO_NET;
             this.fishMudBoil.visible = showBoil;
             if (showBoil) {
                 this.fishMudBoil.position.set(fishWorldPos.x, 0.007, fishWorldPos.z);
-                const boilScale = (0.85 + (this.hookedFish.weight / 14.0) * 0.65) * (0.92 + Math.sin(performance.now() * 0.018) * 0.14);
+                const boilScale = (0.95 + (this.hookedFish.weight / 14.0) * 0.75) * (0.92 + Math.sin(performance.now() * 0.018) * 0.14);
                 this.fishMudBoil.scale.set(boilScale, boilScale, 1);
             }
         }
 
-        // Cập nhật Vệt Sóng Chữ V Cá Chạy Rẽ Nước Đa Tầng (3D V-Wake)
-        if (this.vWakeGroup) {
-            this.vWakeGroup.visible = !this.isSantoJumping && (this.fightPhase !== FIGHT_PHASES.TAP_TO_NET);
-            this.vWakeGroup.position.set(fishWorldPos.x, 0.015, fishWorldPos.z);
-            const baseYaw = Math.atan2(forward.x, forward.z);
-            let wakeYaw = baseYaw;
-            if (moveSpeed > 0.35) wakeYaw = Math.atan2(moveDx, moveDz);
-            else if (this.fightPhase === FIGHT_PHASES.RUN_LEFT) wakeYaw = baseYaw + Math.PI / 2;
-            else if (this.fightPhase === FIGHT_PHASES.RUN_RIGHT) wakeYaw = baseYaw - Math.PI / 2;
+        // Cập nhật Vệt Sóng Kelvin Chữ V Cá Chạy Rẽ Nước Đa Tầng & Dải Bọt Trắng Lưu Dấu Trên Mặt Hồ
+        const baseYaw = Math.atan2(forward.x, forward.z);
+        let wakeYaw = baseYaw;
+        if (moveSpeed > 0.28) wakeYaw = Math.atan2(moveDx, moveDz);
+        else if (this.fightPhase === FIGHT_PHASES.RUN_LEFT) wakeYaw = baseYaw + Math.PI / 2;
+        else if (this.fightPhase === FIGHT_PHASES.RUN_RIGHT) wakeYaw = baseYaw - Math.PI / 2;
 
+        if (this.vWakeGroup) {
+            const showVWake = !this.isSantoJumping && (this.fightPhase !== FIGHT_PHASES.TAP_TO_NET);
+            this.vWakeGroup.visible = showVWake;
+            this.vWakeGroup.position.set(fishWorldPos.x, 0.016, fishWorldPos.z);
             this.vWakeGroup.rotation.y = wakeYaw;
-            const wakePulse = 0.92 + Math.sin(performance.now() * 0.028) * 0.22;
-            const speedStretch = 1.0 + Math.min(1.15, moveSpeed * 0.34);
-            this.vWakeGroup.scale.set(wakePulse * (0.9 + Math.min(0.4, moveSpeed * 0.12)), 1.0, speedStretch);
+
+            const wakePulse = 0.94 + Math.sin(performance.now() * 0.030) * 0.14;
+            const speedWidth = (0.88 + Math.min(0.55, moveSpeed * 0.16)) * weightWakeMul * wakePulse;
+            const speedLength = (0.95 + Math.min(1.45, moveSpeed * 0.38)) * (0.88 + weightWakeMul * 0.22);
+            this.vWakeGroup.scale.set(speedWidth, 1.0, speedLength);
+
+            if (this.bowCrestMesh) {
+                const bowH = 0.75 + Math.min(1.35, moveSpeed * 0.36) * weightWakeMul;
+                this.bowCrestMesh.scale.set(1.0, bowH, 1.0);
+            }
+        }
+
+        // Sinh & cập nhật Dải Bọt Sóng Lưu Dấu Quỹ Đạo Cá Chạy (24 Nodes nở rộng & tan dần tự nhiên trên mặt nước!)
+        if (this.wakeTrailNodes) {
+            if (!this.isSantoJumping && this.fightPhase !== FIGHT_PHASES.TAP_TO_NET && stepDist < 2.5) {
+                this.wakeTrailSpawnDist += stepDist + (moveSpeed > 0.45 ? delta * 0.35 : 0);
+                if (this.wakeTrailSpawnDist >= 0.24) {
+                    this.wakeTrailSpawnDist = 0;
+                    for (let i = 0; i < this.wakeTrailNodes.length; i++) {
+                        const tn = this.wakeTrailNodes[i];
+                        if (tn.life <= 0) {
+                            tn.maxLife = 1.15 + Math.min(0.55, moveSpeed * 0.16);
+                            tn.life = tn.maxLife;
+                            tn.baseScale = (0.68 + Math.min(0.65, moveSpeed * 0.18)) * weightWakeMul;
+                            tn.mesh.position.set(
+                                fishWorldPos.x + (Math.random() - 0.5) * 0.08,
+                                0.013 + (i % 4) * 0.0005,
+                                fishWorldPos.z + (Math.random() - 0.5) * 0.08
+                            );
+                            tn.mesh.rotation.z = -wakeYaw + (Math.random() - 0.5) * 0.25;
+                            tn.mesh.scale.set(tn.baseScale, tn.baseScale * 1.15, 1);
+                            tn.mat.opacity = 0.72;
+                            tn.mesh.visible = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            for (let i = 0; i < this.wakeTrailNodes.length; i++) {
+                const tn = this.wakeTrailNodes[i];
+                if (tn.life > 0) {
+                    tn.life -= delta;
+                    if (tn.life <= 0) {
+                        tn.life = 0;
+                        tn.mesh.visible = false;
+                    } else {
+                        const age = 1.0 - (tn.life / tn.maxLife); // 0 -> 1
+                        const spreadX = tn.baseScale * (1.0 + age * 1.45);
+                        const spreadY = tn.baseScale * (1.15 + age * 0.85);
+                        tn.mesh.scale.set(spreadX, spreadY, 1);
+                        tn.mat.opacity = Math.pow(1.0 - age, 1.45) * 0.68;
+                    }
+                }
+            }
         }
 
         // Cập nhật các hạt bọt nước 3D bắn lên mặt hồ
@@ -4171,7 +4571,6 @@ export class FishingGameplay {
             });
         }
 
-        const baseYaw = Math.atan2(forward.x, forward.z);
         if (this.isSantoJumping) {
             // Animation Cá Santo lộn vòng 360 độ trên không trung + vẫy đuôi mạnh
             this.fish3DGroup.rotation.order = 'YXZ';
@@ -4314,6 +4713,38 @@ export class FishingGameplay {
 
         if (!this.fpvRig.visible) return;
 
+        // 0. Đồng bộ mỏ neo ghế ngồi từ Camera (do PlayerController vừa cập nhật đầu frame) & Nội suy góc nhìn thứ 3 (TPV)
+        this.syncSeatAnchorFromCamera();
+        const isFightingNow = (this.state === FISHING_STATES.FIGHTING && !!this.hookedFish);
+        const targetTpv = isFightingNow ? 1.0 : 0.0;
+        const tpvRate = targetTpv > this.tpvBlend ? Math.min(1, delta * 3.8) : Math.min(1, delta * 4.6);
+        this.tpvBlend += (targetTpv - this.tpvBlend) * tpvRate;
+        if (Math.abs(targetTpv - this.tpvBlend) < 0.002) {
+            this.tpvBlend = targetTpv;
+        }
+        if (this.tpvBlend <= 0.002) {
+            this.tpvCamInitialized = false;
+        }
+
+        // Giữ fpvRig cố định ngay tại ghế bến câu (phẳng ngang mặt sàn bê tông khi chuyển sang TPV)
+        this.fpvRig.position.copy(this.seatEyePos);
+        this.fpvRig.quaternion.copy(this.seatBaseQuat).slerp(this.seatLevelQuat, this.tpvBlend);
+
+        // Dịch gọn Ô Che Nắng sang rìa trái bến khi bo cá để không che khuất góc nhìn thứ 3 từ sau lưng
+        if (this.umbrellaGroup) {
+            this.umbrellaGroup.position.set(-1.38 * this.tpvBlend, 0, 0.38 * this.tpvBlend);
+        }
+        if (this.landingNetGroup) {
+            this.landingNetGroup.rotation.x = -0.44 * this.tpvBlend;
+            this.landingNetGroup.position.y = -0.05 * this.tpvBlend;
+        }
+        if (this.fpvArmGroup) {
+            this.fpvArmGroup.visible = (this.tpvBlend < 0.22);
+        }
+        if (this.tpvAnglerGroup) {
+            this.tpvAnglerGroup.visible = (this.tpvBlend >= 0.14);
+        }
+
         // Đồng bộ màu nước & độ đục thực tế vào Shader cắt mặt nước của Phao Đài
         if (this.environment && this.floatShaderUniforms) {
             this.floatShaderUniforms.uWaterTint.value.copy(this.environment.currentWaterColor).multiplyScalar(0.65);
@@ -4324,6 +4755,80 @@ export class FishingGameplay {
 
         // 1. Cập nhật đường cong Parabol liền mạch của thân cần câu đài & chuyển động khớp lò xo Ô Che Nắng
         this.applyArticulatedRodPose(delta);
+
+        // 1A. Diễn hoạt vật lý Nhân Vật Cần Thủ 3D (Đứng tấn ghì cần, ngả lưng, xoay hông mở bát Trái/Phải & 2 tay ôm cán cần!)
+        if (this.tpvAnglerGroup && this.tpvAnglerGroup.visible && this.tpvAnglerGroup.userData) {
+            const bones = this.tpvAnglerGroup.userData;
+            const lean = isFightingNow ? (this.playerRodLean || 0) : 0;
+            const vert = isFightingNow ? (this.playerRodVert || 0) : 0;
+            const tension = isFightingNow ? (this.lineTension || 0.4) : 0.2;
+            const jolt = isFightingNow ? (this.headShakeImpulse || 0) * Math.sin(performance.now() * 0.048) * 0.035 : 0;
+            const isHaNgu = !!(this.activeFightSkill && this.activeFightSkill.type === 'HA_NGU');
+
+            // Bước chân & dồn trọng tâm hông sang Trái / Phải theo hướng người chơi bo cá
+            this.tpvAnglerGroup.position.set(
+                0.02 + lean * 0.18,
+                -0.86 - Math.max(0, tension - 0.5) * 0.04,
+                -0.02 + Math.max(0, vert) * 0.06
+            );
+            this.tpvAnglerGroup.rotation.y = Math.PI - lean * 0.26;
+
+            // Thân trên: Ngả lưng ra sau vững chãi khi Ghì Lên (+vert), cúi dìm đọt khi Hạ Nhả (-vert / Hạ Ngư)
+            if (bones.upperBody) {
+                const torsoPitch = isHaNgu
+                    ? 0.28
+                    : (vert >= 0
+                        ? (-0.12 - vert * 0.17 - tension * 0.09 + jolt)
+                        : (0.04 + Math.abs(vert) * 0.18));
+                bones.upperBody.position.set(0, 0.81, 0);
+                bones.upperBody.rotation.set(torsoPitch, -lean * 0.20, lean * 0.09);
+            }
+
+            // Đầu & mũ lưỡi trai dõi mắt nhìn theo vị trí con cá đang rẽ nước
+            if (bones.headGroup) {
+                const fishYawTrack = THREE.MathUtils.clamp(-(this.fishLateralX || 0) * 0.075 + lean * 0.22, -0.46, 0.46);
+                bones.headGroup.rotation.set(0.16 - vert * 0.08, fishYawTrack, 0);
+            }
+
+            // Hai chân đứng tấn vững chãi trên sàn bê tông bến câu (chân trái bước nhẹ lên trước, chân phải trụ sau)
+            if (bones.leftLeg && bones.rightLeg) {
+                const kneeFlex = 0.22 + tension * 0.12 + Math.abs(lean) * 0.08;
+                bones.leftLeg.hipPivot.position.set(0.115, 0.84, 0.04);
+                bones.leftLeg.hipPivot.rotation.set(-kneeFlex * 0.68, 0, 0.07 - lean * 0.06);
+                bones.leftLeg.kneePivot.rotation.set(kneeFlex * 1.15, 0, 0);
+
+                bones.rightLeg.hipPivot.position.set(-0.115, 0.84, -0.05);
+                bones.rightLeg.hipPivot.rotation.set(0.08 - kneeFlex * 0.35, 0, -0.07 - lean * 0.06);
+                bones.rightLeg.kneePivot.rotation.set(kneeFlex * 0.95, 0, 0);
+            }
+
+            // Khóa 2 bàn tay vào đúng cán cần Carbon (hoặc tay trái cầm cán Vợt Carbon khi cá đã ngửa bụng!)
+            this.fpvRig.updateMatrixWorld(true);
+            if (bones.upperBody && bones.rightArm && this.rodFrontGripAnchor) {
+                const rightTarget = new THREE.Vector3();
+                this.rodFrontGripAnchor.getWorldPosition(rightTarget);
+                this.solveTwoBoneArmIK(
+                    bones.rightArm,
+                    bones.upperBody,
+                    rightTarget,
+                    new THREE.Vector3(-0.48, -0.82, -0.25)
+                );
+            }
+            if (bones.upperBody && bones.leftArm) {
+                const leftTarget = new THREE.Vector3();
+                if (this.landingNetGroup && this.landingNetGroup.visible && this.landingNetGripAnchor) {
+                    this.landingNetGripAnchor.getWorldPosition(leftTarget);
+                } else if (this.rodButtGripAnchor) {
+                    this.rodButtGripAnchor.getWorldPosition(leftTarget);
+                }
+                this.solveTwoBoneArmIK(
+                    bones.leftArm,
+                    bones.upperBody,
+                    leftTarget,
+                    new THREE.Vector3(0.48, -0.82, -0.25)
+                );
+            }
+        }
 
         if (this.umbrellaHeadPivot && this.umbrellaGroup && this.umbrellaGroup.visible) {
             const isRain = this.environment && this.environment.weather === 'RAINY';
@@ -5002,17 +5507,29 @@ export class FishingGameplay {
                         if (instSpeed > 0.18) {
                             this.lineCutWakeGroup.rotation.y = Math.atan2(cdx, cdz);
                         }
-                        const sScale = 0.75 + Math.min(0.95, this.lineCutSpeed * 0.28) + this.lineTension * 0.25;
-                        this.lineCutWakeGroup.scale.set(sScale, 1.0, sScale * 1.15);
+                        const sScale = 0.78 + Math.min(1.15, this.lineCutSpeed * 0.34) + this.lineTension * 0.28;
+                        this.lineCutWakeGroup.scale.set(sScale, 1.0, sScale * 1.22);
+
+                        // Lưỡi nước dựng đứng (Rooster-Tail Spray) bắn vọt cao theo vận tốc cước xé mặt hồ!
+                        if (this.lineRoosterTail) {
+                            const roosterPower = THREE.MathUtils.clamp(this.lineCutSpeed * (0.45 + this.lineTension * 0.65), 0, 2.4);
+                            this.lineRoosterTail.visible = (roosterPower > 0.14);
+                            const rH = 0.45 + roosterPower * 0.88;
+                            const rLen = 0.65 + roosterPower * 0.55;
+                            this.lineRoosterTail.scale.set(rLen, rH, 1.0);
+                            this.lineRoosterTail.position.set(0, 0.09 * rH, -0.10 * rLen);
+                            this.lineRoosterTail.material.opacity = THREE.MathUtils.clamp(0.32 + roosterPower * 0.38, 0.25, 0.94);
+                        }
 
                         this.lineCutRippleCooldown -= delta;
-                        if (this.lineCutRippleCooldown <= 0 && (this.lineCutSpeed > 0.45 || this.lineTension > 0.62)) {
-                            this.lineCutRippleCooldown = this.lineCutSpeed > 1.5 ? 0.09 : 0.16;
+                        if (this.lineCutRippleCooldown <= 0 && (this.lineCutSpeed > 0.38 || this.lineTension > 0.60)) {
+                            this.lineCutRippleCooldown = this.lineCutSpeed > 1.3 ? 0.075 : 0.14;
                             if (this.bubbleSystem.spawnMicroRipple) {
-                                this.bubbleSystem.spawnMicroRipple(cutX, cutZ, 1.35);
+                                this.bubbleSystem.spawnMicroRipple(cutX, cutZ, 1.45);
                             }
-                            if (this.lineCutSpeed > 0.9) {
-                                this.spawnWaterSprayBurst(cutX, cutZ, 2, 1.25, 0.75);
+                            if (this.lineCutSpeed > 0.65) {
+                                const dropCnt = this.lineCutSpeed > 1.8 ? 4 : 2;
+                                this.spawnWaterSprayBurst(cutX, cutZ, dropCnt, 1.4 + this.lineCutSpeed * 0.28, 0.85 + this.lineCutSpeed * 0.2);
                             }
                         }
                     } else {
@@ -5046,6 +5563,59 @@ export class FishingGameplay {
                 posAttr.setXYZ(i, px, py, pz);
             }
             posAttr.needsUpdate = true;
+        }
+
+        // 4. CHUYỂN ĐỔI MƯỢT MÀ CAMERA SANG GÓC NHÌN THỨ 3 ĐIỆN ẢNH KHI BO CÁ (OVER-THE-SHOULDER 3RD-PERSON ACTION CAM)
+        if (this.tpvBlend > 0.001) {
+            const lean = isFightingNow ? (this.playerRodLean || 0) : 0;
+            const vert = isFightingNow ? (this.playerRodVert || 0) : 0;
+            const fishDist = isFightingNow ? THREE.MathUtils.clamp(this.fishDistance || 5.5, 2.0, 12.5) : 5.5;
+            const fishLat = isFightingNow ? (this.fishLateralX || 0) : 0;
+            const jumpY = isFightingNow ? (this.lastJumpArcY || 0) : 0;
+
+            // Đặt Camera chếch sau vai phải trên cao (~2.08m), nhìn bao quát cả Cần Thủ 3D đứng bo cần, cây cần cong chữ C và vệt cá chạy rẽ nước!
+            this.tpvCamPos
+                .copy(this.seatEyePos)
+                .addScaledVector(this.seatForward, -2.42 + vert * 0.14)
+                .addScaledVector(this.seatRight, 1.18 + lean * 0.26);
+            this.tpvCamPos.y = this.seatEyePos.y + 0.84 - vert * 0.06;
+
+            // Điểm hội tụ ánh nhìn giữa thân cần đang uốn cong và vị trí cá quẫy rẽ nước trước bến
+            const lookForwardDist = 2.55 + fishDist * 0.36;
+            const lookLateral = fishLat * 0.44 + lean * 0.16;
+            this.tpvLookTarget
+                .copy(this.seatEyePos)
+                .addScaledVector(this.seatForward, lookForwardDist)
+                .addScaledVector(this.seatRight, lookLateral);
+            this.tpvLookTarget.y = 0.42 + jumpY * 0.42 + Math.max(0, vert) * 0.14;
+
+            if (!this.tpvCamInitialized) {
+                this.smoothedTpvCamPos.copy(this.tpvCamPos);
+                this.smoothedTpvLook.copy(this.tpvLookTarget);
+                this.tpvCamInitialized = true;
+            } else {
+                const followRate = Math.min(1.0, delta * 6.8);
+                this.smoothedTpvCamPos.lerp(this.tpvCamPos, followRate);
+                this.smoothedTpvLook.lerp(this.tpvLookTarget, followRate);
+            }
+
+            // Rung chấn vật lý chân thực lên ống kính khi cá quẫy lắc đầu mạnh hoặc dây căng đỏ > 80%
+            const shakeAmp = isFightingNow
+                ? ((this.headShakeImpulse || 0) * 0.016 + Math.max(0, (this.lineTension || 0) - 0.78) * 0.028)
+                : 0;
+            const camFinalTpv = this.smoothedTpvCamPos.clone();
+            if (shakeAmp > 0.0005) {
+                const tNow = performance.now() * 0.042;
+                camFinalTpv.x += Math.sin(tNow * 1.7) * shakeAmp;
+                camFinalTpv.y += Math.cos(tNow * 2.3) * shakeAmp * 0.85;
+            }
+
+            const lookMat = new THREE.Matrix4().lookAt(camFinalTpv, this.smoothedTpvLook, new THREE.Vector3(0, 1, 0));
+            const tpvQuat = new THREE.Quaternion().setFromRotationMatrix(lookMat);
+            const easeTpv = this.tpvBlend * this.tpvBlend * (3.0 - 2.0 * this.tpvBlend);
+
+            this.camera.position.copy(this.seatEyePos).lerp(camFinalTpv, easeTpv);
+            this.camera.quaternion.copy(this.seatBaseQuat).slerp(tpvQuat, easeTpv);
         }
     }
 

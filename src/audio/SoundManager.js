@@ -294,6 +294,87 @@ class SoundManager {
         noise.start(now);
     }
 
+    // Tiếng BỨT TỐC RÍT CƯỚC GẮT ("VÚÚÚT... ZÍÍÍTTT... XÈÈÈ!") mỗi khi cá lớn phát lực phóng mạnh đổi hướng!
+    playHardRunScream(intensity = 1.0, fishWeight = 6.0) {
+        if (!this.ctx || this.isMuted) return;
+        const now = this.ctx.currentTime;
+        const pwr = Math.max(0.4, Math.min(1.6, intensity));
+        const wFactor = Math.max(0.75, Math.min(1.45, 0.75 + fishWeight * 0.045));
+        const dur = 0.62 + Math.min(0.35, fishWeight * 0.02);
+
+        // 1. Tiếng dây trục căng vút gió ngân cao (Aeolian Line Whine Sweep)
+        const oscMain = this.ctx.createOscillator();
+        const oscHarm = this.ctx.createOscillator();
+        const whineFilter = this.ctx.createBiquadFilter();
+        const whineGain = this.ctx.createGain();
+
+        oscMain.type = 'sine';
+        oscHarm.type = 'sawtooth';
+
+        const startF = (680 + pwr * 280) / Math.pow(wFactor, 0.18);
+        const peakF = startF + 520 * pwr + Math.random() * 140;
+
+        oscMain.frequency.setValueAtTime(startF, now);
+        oscMain.frequency.exponentialRampToValueAtTime(peakF, now + dur * 0.38);
+        oscMain.frequency.exponentialRampToValueAtTime(startF * 1.12, now + dur);
+
+        oscHarm.frequency.setValueAtTime(startF * 1.498, now);
+        oscHarm.frequency.exponentialRampToValueAtTime(peakF * 1.504, now + dur * 0.38);
+        oscHarm.frequency.exponentialRampToValueAtTime(startF * 1.68, now + dur);
+
+        whineFilter.type = 'bandpass';
+        whineFilter.frequency.setValueAtTime(peakF * 1.15, now);
+        whineFilter.Q.setValueAtTime(5.8, now);
+
+        const peakVol = Math.min(0.28, (0.11 + pwr * 0.11) * wFactor);
+        whineGain.gain.setValueAtTime(0.001, now);
+        whineGain.gain.linearRampToValueAtTime(peakVol, now + 0.07);
+        whineGain.gain.setValueAtTime(peakVol * 0.88, now + dur * 0.45);
+        whineGain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+
+        const harmGain = this.ctx.createGain();
+        harmGain.gain.value = 0.28;
+
+        oscMain.connect(whineFilter);
+        oscHarm.connect(harmGain);
+        harmGain.connect(whineFilter);
+        whineFilter.connect(whineGain);
+        whineGain.connect(this.ctx.destination);
+
+        oscMain.start(now);
+        oscHarm.start(now);
+        oscMain.stop(now + dur + 0.03);
+        oscHarm.stop(now + dur + 0.03);
+
+        // 2. Tiếng cước xé toạc mặt nước ("XÈÈÈÈÈ!") đồng bộ cú phóng của cá
+        const bufLen = Math.floor(this.ctx.sampleRate * dur);
+        const nBuf = this.ctx.createBuffer(1, bufLen, this.ctx.sampleRate);
+        const ch = nBuf.getChannelData(0);
+        for (let i = 0; i < bufLen; i++) {
+            const u = i / bufLen;
+            const env = Math.sin(Math.pow(u, 0.65) * Math.PI);
+            ch[i] = (Math.random() * 2 - 1) * env;
+        }
+        const nSrc = this.ctx.createBufferSource();
+        nSrc.buffer = nBuf;
+
+        const ripFilter = this.ctx.createBiquadFilter();
+        ripFilter.type = 'bandpass';
+        ripFilter.frequency.setValueAtTime(1900, now);
+        ripFilter.frequency.exponentialRampToValueAtTime(3800, now + dur * 0.4);
+        ripFilter.frequency.exponentialRampToValueAtTime(2200, now + dur);
+        ripFilter.Q.setValueAtTime(2.2, now);
+
+        const ripGain = this.ctx.createGain();
+        ripGain.gain.setValueAtTime(Math.min(0.26, 0.12 * pwr * wFactor), now);
+        ripGain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+
+        nSrc.connect(ripFilter);
+        ripFilter.connect(ripGain);
+        ripGain.connect(this.ctx.destination);
+        nSrc.start(now);
+    }
+
     // ==================== HỆ THỐNG CƯỚC RÍT LIÊN TỤC ĐỘNG THEO CÁ CHẠY ====================
     startLineSingLoop() {
         if (!this.ctx || this.isMuted || this.lineSingLoop) return;
@@ -366,11 +447,13 @@ class SoundManager {
         };
     }
 
-    // Cập nhật realtime cao độ & âm lượng cước rít theo lực căng, tốc độ chạy, trọng lượng cá & pha chạy
-    updateLineSingLoop(tension = 0.5, runIntensity = 1.0, fishWeight = 3.0, phase = 'RUN_OUT') {
+    // Cập nhật realtime cao độ & âm lượng cước rít theo lực căng, tốc độ chạy, trọng lượng cá, pha chạy & vận tốc cắt nước
+    updateLineSingLoop(tension = 0.5, runIntensity = 1.0, fishWeight = 3.0, phase = 'RUN_OUT', cutSpeed = 0.0) {
         if (!this.ctx || this.isMuted) return;
         const clampedTension = Math.max(0, Math.min(1, tension));
-        const activeLevel = clampedTension * 0.68 + Math.min(1.5, runIntensity) * 0.32;
+        const speedBoost = Math.min(1.4, (cutSpeed || 0) * 0.35);
+        const effRun = Math.min(1.85, runIntensity + speedBoost);
+        const activeLevel = clampedTension * 0.62 + effRun * 0.38;
 
         if (activeLevel < 0.16) {
             if (this.lineSingLoop) {
@@ -390,42 +473,44 @@ class SoundManager {
         const loop = this.lineSingLoop;
 
         // Trọng lượng cá ảnh hưởng độ trầm/dày và lực xé nước
-        const weightFactor = Math.min(1.45, 0.8 + fishWeight * 0.055);
+        const weightFactor = Math.min(1.55, 0.8 + fishWeight * 0.055);
         // Pha chạy ảnh hưởng sắc thái: lao ngang rẽ nước mạnh hơn, lao thẳng rít cao hơn
         let phasePitchMul = 1.0;
         let sliceMul = 1.0;
         if (phase === 'RUN_OUT') {
-            phasePitchMul = 1.12;
-            sliceMul = 1.15;
+            phasePitchMul = 1.15;
+            sliceMul = 1.22;
         } else if (phase === 'RUN_LEFT' || phase === 'RUN_RIGHT') {
-            phasePitchMul = 1.04;
-            sliceMul = 1.38; // Chạy ngang cắt mặt nước xè xè cực rõ
+            phasePitchMul = 1.06;
+            sliceMul = 1.48; // Chạy ngang cắt mặt nước xè xè cực rõ
         } else if (phase === 'HAZARD') {
-            phasePitchMul = 1.28; // Lao cọc rít gắt cảnh báo
-            sliceMul = 1.5;
+            phasePitchMul = 1.32; // Lao cọc rít gắt cảnh báo
+            sliceMul = 1.62;
         } else if (phase === 'PIN_SURFACE') {
-            phasePitchMul = 0.78;
-            sliceMul = 0.55;
+            phasePitchMul = 0.76;
+            sliceMul = 0.45;
         } else if (phase === 'TAP_TO_NET') {
-            phasePitchMul = 0.65;
-            sliceMul = 0.25;
+            phasePitchMul = 0.62;
+            sliceMul = 0.18;
         }
 
-        // Tần số dây cước rít: từ ~720Hz đến ~2550Hz theo lực căng & tốc độ chạy
-        const targetFreq = Math.min(2650, (700 + clampedTension * 1380 + runIntensity * 260) * phasePitchMul / Math.pow(weightFactor, 0.25));
-        loop.osc1.frequency.setTargetAtTime(targetFreq, now, 0.06);
-        loop.osc2.frequency.setTargetAtTime(targetFreq * 1.503, now, 0.06);
-        loop.toneFilter.frequency.setTargetAtTime(targetFreq * 1.22, now, 0.06);
-        loop.lfo.frequency.setTargetAtTime(6.0 + clampedTension * 7.5 + runIntensity * 2.5, now, 0.08);
-        loop.lfoGain.gain.setTargetAtTime(14 + clampedTension * 32, now, 0.08);
+        // Tần số dây cước rít: vút cao cực gắt khi cá bứt tốc cắt mặt nước mạnh + căng cước!
+        const targetFreq = Math.min(2850, (680 + clampedTension * 1420 + effRun * 340) * phasePitchMul / Math.pow(weightFactor, 0.22));
+        loop.osc1.frequency.setTargetAtTime(targetFreq, now, 0.045);
+        loop.osc2.frequency.setTargetAtTime(targetFreq * 1.503, now, 0.045);
+        loop.toneFilter.frequency.setTargetAtTime(targetFreq * 1.22, now, 0.045);
+        loop.lfo.frequency.setTargetAtTime(6.5 + clampedTension * 8.5 + effRun * 3.2, now, 0.06);
+        loop.lfoGain.gain.setTargetAtTime(16 + clampedTension * 36 + speedBoost * 18, now, 0.06);
 
-        // Âm lượng dây rít & tiếng xé nước
-        const targetToneVol = Math.min(0.24, (0.025 + Math.pow(clampedTension, 1.3) * 0.16) * (0.65 + runIntensity * 0.38));
-        const targetSliceVol = Math.min(0.22, (0.018 + clampedTension * 0.09) * runIntensity * sliceMul * weightFactor);
+        // Âm lượng dây rít & tiếng xé nước tỷ lệ trực tiếp với độ mạnh cú chạy của cá!
+        const isHardRun = (phase === 'RUN_OUT' || phase === 'RUN_LEFT' || phase === 'RUN_RIGHT' || phase === 'HAZARD');
+        const runVolBoost = isHardRun ? (0.75 + effRun * 0.48) : 0.42;
+        const targetToneVol = Math.min(0.28, (0.022 + Math.pow(clampedTension, 1.22) * 0.18) * runVolBoost);
+        const targetSliceVol = Math.min(0.26, (0.020 + clampedTension * 0.10 + speedBoost * 0.06) * effRun * sliceMul * weightFactor);
 
-        loop.toneGain.gain.setTargetAtTime(targetToneVol, now, 0.05);
-        loop.sliceFilter.frequency.setTargetAtTime(2100 + clampedTension * 1900 + runIntensity * 500, now, 0.06);
-        loop.sliceGain.gain.setTargetAtTime(targetSliceVol, now, 0.05);
+        loop.toneGain.gain.setTargetAtTime(targetToneVol, now, 0.04);
+        loop.sliceFilter.frequency.setTargetAtTime(2000 + clampedTension * 2000 + effRun * 620, now, 0.05);
+        loop.sliceGain.gain.setTargetAtTime(targetSliceVol, now, 0.04);
     }
 
     stopLineSingLoop() {
